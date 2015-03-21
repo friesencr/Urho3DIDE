@@ -42,6 +42,13 @@
 #include "Urho3DPlayer.h"
 
 #include <Urho3D/DebugNew.h>
+#include "Project/ProjectManager.h"
+#include "../Resource/XMLFile.h"
+#include "../IO/File.h"
+#include "../Container/Ptr.h"
+#include "../Resource/Resource.h"
+#include "../IO/Deserializer.h"
+
 
 DEFINE_APPLICATION_MAIN(Urho3DPlayer);
 
@@ -52,82 +59,39 @@ Urho3DPlayer::Urho3DPlayer(Context* context) :
 
 void Urho3DPlayer::Setup()
 {
+	ProjectSettings::RegisterObject(context_);
     FileSystem* filesystem = GetSubsystem<FileSystem>();
+	project_ = new ProjectSettings(context_);
+	
+    String projectFileName = filesystem->GetProgramDir() + "Urho3DProject.xml";
 
-    // Read command line from a file if no arguments given. This is primarily intended for mobile platforms.
-    // Note that the command file name uses a hardcoded path that does not utilize the resource system
-    // properly (including resource path prefix), as the resource system is not yet initialized at this point
-    const String commandFileName = filesystem->GetProgramDir() + "Data/CommandLine.txt";
-    if (GetArguments().Empty() && filesystem->FileExists(commandFileName))
+	if (filesystem->FileExists(projectFileName))
     {
-        SharedPtr<File> commandFile(new File(context_, commandFileName));
-        String commandLine = commandFile->ReadLine();
-        commandFile->Close();
-        ParseArguments(commandLine, false);
-        // Reparse engine startup parameters now
-        engineParameters_ = Engine::ParseParameters(GetArguments());
+		SharedPtr<File> projectFile(new File(context_, projectFileName));
+		SharedPtr<XMLFile> projectxml( new XMLFile(context_));
+		if (!projectxml->Load(*projectFile.Get()))
+		{
+			ErrorExit("Could not load Project File  Urho3DProject.xml");
+		}
+		project_->LoadXML(projectxml->GetRoot());
     }
+	if (project_->mainScript_.Empty())
+	{
+		ErrorExit("No Script defined in Urho3DProject.xml");
+	}
+	scriptFileName_ = project_->mainScript_;
 
-    // Check for script file name
-    const Vector<String>& arguments = GetArguments();
-    String scriptFileName;
-    if (arguments.Size() && arguments[0][0] != '-')
-        scriptFileName_ = GetInternalPath(arguments[0]);
-
-    // Show usage if not found
-    if (scriptFileName_.Empty())
-    {
-        ErrorExit("Usage: Urho3DPlayer <scriptfile> [options]\n\n"
-            "The script file should implement the function void Start() for initializing the "
-            "application and subscribing to all necessary events, such as the frame update.\n"
-            #ifndef WIN32
-            "\nCommand line options:\n"
-            "-x <res>     Horizontal resolution\n"
-            "-y <res>     Vertical resolution\n"
-            "-m <level>   Enable hardware multisampling\n"
-            "-v           Enable vertical sync\n"
-            "-t           Enable triple buffering\n"
-            "-w           Start in windowed mode\n"
-            "-s           Enable resizing when in windowed mode\n"
-            "-q           Enable quiet mode which does not log to standard output stream\n"
-            "-b <length>  Sound buffer length in milliseconds\n"
-            "-r <freq>    Sound mixing frequency in Hz\n"
-            "-p <paths>   Resource path(s) to use, separated by semicolons\n"
-            "-ap <paths>  Autoload resource path(s) to use, seperated by semicolons\n"
-            "-log <level> Change the log level, valid 'level' values are 'debug', 'info', 'warning', 'error'\n"
-            "-ds <file>   Dump used shader variations to a file for precaching\n"
-            "-mq <level>  Material quality level, default 2 (high)\n"
-            "-tq <level>  Texture quality level, default 2 (high)\n"
-            "-tf <level>  Texture filter mode, default 2 (trilinear)\n"
-            "-af <level>  Texture anisotropy level, default 4. Also sets anisotropic filter mode\n"
-            "-flushgpu    Flush GPU command queue each frame. Effective only on Direct3D9\n"
-            "-borderless  Borderless window mode\n"
-            "-headless    Headless mode. No application window will be created\n"
-            "-landscape   Use landscape orientations (iOS only, default)\n"
-            "-portrait    Use portrait orientations (iOS only)\n"
-            "-prepass     Use light pre-pass rendering\n"
-            "-deferred    Use deferred rendering\n"
-            "-renderpath <name> Use the named renderpath (must enter full resource name)\n"
-            "-lqshadows   Use low-quality (1-sample) shadow filtering\n"
-            "-noshadows   Disable shadow rendering\n"
-            "-nolimit     Disable frame limiter\n"
-            "-nothreads   Disable worker threads\n"
-            "-nosound     Disable sound output\n"
-            "-noip        Disable sound mixing interpolation\n"
-            "-sm2         Force SM2.0 rendering\n"
-            "-touch       Touch emulation on desktop platform\n"
-            #endif
-        );
-    }
-    else
-    {
-        // Use the script file name as the base name for the log file
-        engineParameters_["LogName"] = filesystem->GetAppPreferencesDir("urho3d", "logs") + GetFileNameAndExtension(scriptFileName_) + ".log";
-    }
+     // Use the script file name as the base name for the log file
+     engineParameters_["LogName"] = filesystem->GetAppPreferencesDir("urho3d", "logs") + GetFileNameAndExtension(scriptFileName_) + ".log";
+	 engineParameters_["ResourcePaths"] = project_->resFolders_;
+	 engineParameters_["WindowTitle"] = project_->name_;
+	 engineParameters_["FullScreen"] = false;
+	 engineParameters_["WindowIcon"] = project_->icon_;
 }
 
 void Urho3DPlayer::Start()
 {
+
     String extension = GetExtension(scriptFileName_);
     if (extension != ".lua" && extension != ".luc")
     {

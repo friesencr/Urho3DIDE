@@ -138,7 +138,7 @@ namespace Urho3D
 		SharedPtr<XMLFile>	styleFile_;
 		SharedPtr<XMLFile>	iconStyle_;
 		///	Constants for accessing xmlResources
-		Vector<XMLFile*>	xmlResources_;
+		Vector< SharedPtr<XMLFile> >	xmlResources_;
 		/// Exceptions for string attributes that should not be continuously edited
 		Vector<String>		noTextChangedAttrs_;
 

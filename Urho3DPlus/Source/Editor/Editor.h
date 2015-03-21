@@ -18,6 +18,7 @@ namespace Urho3D
 	class Resource;
 	class XMLFile;
 	class FileSelector;
+	class FileSystem;
 
 	class MenuBarUI;
 	class MiniToolBarUI;
@@ -28,6 +29,7 @@ namespace Urho3D
 	class EditorData;
 	class EditorView;
 	class EditorPlugin;
+	class ProjectSettings;
 
 	class Editor : public Object
 	{
@@ -36,9 +38,16 @@ namespace Urho3D
 		Editor(Context* context);
 		virtual ~Editor();
 		static void RegisterObject(Context* context);
-		/// create the Editor
+		/// create the Editor but dont load the plugins 
 		bool Create(Scene* scene, UIElement* sceneUI);
-		
+		/// load plugins 
+		void LoadPlugins();
+		/// open the project
+		void OpenProject(ProjectSettings * project);
+		/// load scene 
+		bool LoadScene(const String& fileName);
+
+
 		/// adds the plugin to the editor data, if plugin has the main screen then add it to the middle frame tabs.
 		void AddEditorPlugin(EditorPlugin* plugin);
 		/// remove the plugin
@@ -77,7 +86,6 @@ namespace Urho3D
 
 	protected: 
 		void HandleUpdate(StringHash eventType, VariantMap& eventData);
-
 		/// Handle Menu Bar Events
 		void HandleMenuBarAction(StringHash eventType, VariantMap& eventData);
 		/// Handle Events
@@ -86,10 +94,14 @@ namespace Urho3D
 		void HandleHierarchyListSelectionChange(StringHash eventType, VariantMap& eventData);
 		void HandleHierarchyListDoubleClick(StringHash eventType, VariantMap& eventData);
 		
+		void AddResourcePath(String newPath, bool usePreferredDir = true);
+
+
 		///cached subsystems
 		ResourceCache*	cache_;
 		UI*				ui_;
 		Graphics*		graphics_;
+		FileSystem*		fileSystem_;
 
 		/// is the editor visible, used for the in game editor
 		bool visible_;

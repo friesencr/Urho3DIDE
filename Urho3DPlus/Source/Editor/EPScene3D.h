@@ -202,7 +202,9 @@ namespace Urho3D
 		void ResetCamera();
 		void ReacquireCameraYawPitch();
 		void UpdateViewParameters();
-
+		// grid 
+		void HideGrid();
+		void ShowGrid();
 	protected:
 		void Start();
 
@@ -297,8 +299,7 @@ namespace Urho3D
 
 		//////////////////////////////////////////////////////////////////////////
 		/// Grid handling \todo put it into a component or object ...
-		void HideGrid();
-		void ShowGrid();
+
 		void CreateGrid();
 		void UpdateGrid(bool updateGridGeometry = true);
 

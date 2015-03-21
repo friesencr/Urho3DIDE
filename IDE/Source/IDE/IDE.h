@@ -60,8 +60,6 @@ namespace Urho3D
 		void Quit();
 
 	protected:
-		void CreateIdeEditor();
-		void CreateDefaultScene();
 		void HandleQuitMessageAck(StringHash eventType, VariantMap& eventData);
 		/// Handle key down event to process key controls common to all samples.
 		void HandleKeyDown(StringHash eventType, VariantMap& eventData);

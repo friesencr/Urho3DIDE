@@ -23,6 +23,10 @@
 #pragma once
 
 #include <Urho3D/Engine/Application.h>
+namespace Urho3D
+{
+	class ProjectSettings;
+}
 
 using namespace Urho3D;
 
@@ -53,6 +57,7 @@ private:
     /// Script file name.
     String scriptFileName_;
     
+	SharedPtr<ProjectSettings> project_;
 #ifdef URHO3D_ANGELSCRIPT
     /// Script file.
     SharedPtr<ScriptFile> scriptFile_;

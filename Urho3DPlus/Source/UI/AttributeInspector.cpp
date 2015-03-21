@@ -132,7 +132,7 @@ namespace Urho3D
 
 		String resources[] = { "UI/EditorInspector_Attribute.xml", "UI/EditorInspector_Variable.xml", "UI/EditorInspector_Style.xml" };
 		for (unsigned int i = 0; i < 3; ++i)
-			xmlResources_.Push(cache_->GetResource<XMLFile>(resources[i]));
+			xmlResources_.Push(SharedPtr<XMLFile>(cache_->GetResource<XMLFile>(resources[i])));
 
 		Update(); 
 
