@@ -24,6 +24,7 @@ namespace Urho3D
 
 	class MenuBarUI;
 	class ToolBarUI;
+	class MiniToolBarUI;
 
 	class TabWindow;
 	class EditorData;
@@ -49,12 +50,16 @@ namespace Urho3D
 
 		void SetRightFrameVisible(bool enable);
 		bool IsRightFrameVisible() const;
-	
+
+// 	
+// 		void SetMiniToolBarVisible(bool enable);
+// 		bool IsMiniToolBarVisible() const;
 		
 		TabWindow* GetLeftFrame();
 		TabWindow* GetRightFrame();
 		TabWindow* GetMiddleFrame();
 		ToolBarUI* GetToolBar();
+		MiniToolBarUI* GetMiniToolBar();
 		MenuBarUI* GetGetMenuBar();
 
 		U_PROPERTY_IMP(int, minLeftFrameWidth_, MinLeftFrameWidth);
@@ -69,6 +74,7 @@ namespace Urho3D
 		SharedPtr<UIElement> uiRoot_;
 		SharedPtr<MenuBarUI> menubar_;
 		SharedPtr<ToolBarUI> toolbar_;
+		SharedPtr<MiniToolBarUI> miniToolbar_;
 		SharedPtr<TabWindow> leftFrame_;
 		SharedPtr<TabWindow> middleFrame_;
 		SharedPtr<TabWindow> rightFrame_;

@@ -38,7 +38,7 @@ namespace Urho3D
 
 		OBJECT(EditorData);
 	public:
-		EditorData(Context* context);
+		EditorData(Context* context, Editor* editor = NULL);
 		virtual ~EditorData();
 		static void RegisterObject(Context* context);
 		void Load();
@@ -66,6 +66,31 @@ namespace Urho3D
 		XMLFile*	GetDefaultStyle(){ return defaultStyle_; }
 		XMLFile*	GetIconStyle() { return iconStyle_; }
 		UIElement*	GetEdiorRootUI() { return rootUI_; }
+		Editor*		GetEditor();
+
+		Vector<String> uiSceneFilters;
+		Vector<String> uiElementFilters;
+		Vector<String> uiAllFilters;
+		Vector<String> uiScriptFilters;
+		Vector<String> uiParticleFilters;
+		Vector<String> uiRenderPathFilters;
+		unsigned int uiSceneFilter;
+		unsigned int  uiElementFilter;
+		unsigned int  uiNodeFilter;
+		unsigned int  uiImportFilter;
+		unsigned int  uiScriptFilter;
+		unsigned int  uiParticleFilter;
+		unsigned int  uiRenderPathFilter;
+		String uiScenePath;
+		String uiElementPath;
+		String uiNodePath;
+		String uiImportPath;
+		String uiScriptPath;
+		String uiParticlePath;
+		String uiRenderPathPath;
+		Vector<String> uiRecentScenes;
+		String screenshotDir;
+
 	protected:
 
 		SharedPtr<Scene> scene_;
@@ -73,7 +98,7 @@ namespace Urho3D
 		SharedPtr<XMLFile> defaultStyle_;
 		SharedPtr<XMLFile> iconStyle_;
 		SharedPtr<UIElement> rootUI_;
-
+		Editor* editor_;
 		// Node or UIElement hash-to-varname reverse mapping
 		VariantMap globalVarNames_;
 		/// Editor plugin handling

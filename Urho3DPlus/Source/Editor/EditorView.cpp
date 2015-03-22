@@ -46,8 +46,8 @@ namespace Urho3D
 		graphics_ = GetSubsystem<Graphics>();
 		ui_ = GetSubsystem<UI>();
 
-		XMLFile* styleFile = NULL; 
-		XMLFile* iconstyle = NULL; 
+		XMLFile* styleFile = NULL;
+		XMLFile* iconstyle = NULL;
 		if (data)
 		{
 			styleFile = data->GetDefaultStyle();
@@ -56,10 +56,9 @@ namespace Urho3D
 		else
 		{
 			styleFile = cache_->GetResource<XMLFile>("UI/IDEStyle.xml");
-			iconstyle =  cache_->GetResource<XMLFile>("UI/IDEIcons.xml");
+			iconstyle = cache_->GetResource<XMLFile>("UI/IDEIcons.xml");
 		}
 
-		
 		uiRoot_ = data->GetEdiorRootUI();
 
 		menubar_ = MenuBarUI::Create(uiRoot_, "EditorMenuBar");
@@ -72,14 +71,19 @@ namespace Urho3D
 		mainFrameUI_->SetDefaultStyle(styleFile);
 		mainFrameUI_->SetFixedSize(ui_->GetRoot()->GetWidth(), minitoolheight);
 
+		miniToolbar_ = MiniToolBarUI::Create(mainFrameUI_, "EditorMiniToolBar", iconstyle, 28, minitoolheight, styleFile);
+	
+
 		leftFrame_ = mainFrameUI_->CreateChild<TabWindow>("LeftFrame");
+
 		leftFrame_->SetStyle("TabWindow");
 		leftFrame_->SetWidth(200);
 		leftFrame_->SetFixedHeight(minitoolheight);
 		leftFrame_->SetResizable(true);
-		leftFrame_->SetResizeBorder(IntRect(6,6,6,6));
+		leftFrame_->SetResizeBorder(IntRect(6, 6, 6, 6));
 		leftFrame_->SetLayoutBorder(IntRect(4, 4, 4, 4));
-	
+		leftFrame_->SetPosition(miniToolbar_->GetPosition() + IntVector2(miniToolbar_->GetWidth(), 0));
+
 		middleFrame_ = mainFrameUI_->CreateChild<TabWindow>("MiddleFrame");
 		middleFrame_->SetPosition(leftFrame_->GetPosition() + IntVector2(leftFrame_->GetWidth(), 0));
 		middleFrame_->SetStyle("TabWindow");
@@ -108,10 +112,9 @@ namespace Urho3D
 	{
 	}
 
-
 	void EditorView::RegisterObject(Context* context)
 	{
-		context->RegisterFactory<EditorView>("Editor");
+		context->RegisterFactory<EditorView>();
 	}
 
 	void EditorView::HandlePost(StringHash eventType, VariantMap& eventData)
@@ -131,10 +134,10 @@ namespace Urho3D
 			middleFrame_->SetPosition(leftFrame_->GetPosition() + IntVector2(leftFrame_->GetWidth(), 0));
 			if (rightFrame_->IsVisible())
 			{
-				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - leftFrame_->GetWidth() - rightFrame_->GetWidth());
-			}else
-				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - leftFrame_->GetWidth());
-
+				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - leftFrame_->GetWidth() - rightFrame_->GetWidth() - miniToolbar_->GetWidth());
+			}
+			else
+				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - leftFrame_->GetWidth() - miniToolbar_->GetWidth());
 		}
 		else if (element == rightFrame_)
 		{
@@ -144,19 +147,13 @@ namespace Urho3D
 			}
 			if (leftFrame_->IsVisible())
 			{
-				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - leftFrame_->GetWidth() - rightFrame_->GetWidth());
+				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - leftFrame_->GetWidth() - rightFrame_->GetWidth() - miniToolbar_->GetWidth());
 			}
 			else
-				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - rightFrame_->GetWidth());
+				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - rightFrame_->GetWidth() - miniToolbar_->GetWidth());
 
 			rightFrame_->SetPosition(middleFrame_->GetPosition() + IntVector2(middleFrame_->GetWidth(), 0));
-
 		}
-
-
-
-
-		
 	}
 
 	void EditorView::UpdateLayout()
@@ -168,32 +165,38 @@ namespace Urho3D
 		middleFrame_->SetFixedHeight(minitoolheight);
 		if (leftFrame_->IsVisible())
 		{
+			if (miniToolbar_->IsVisible())
+				leftFrame_->SetPosition(miniToolbar_->GetPosition() + IntVector2(miniToolbar_->GetWidth(), 0));
+			else
+				leftFrame_->SetPosition(IntVector2::ZERO);
+
 			middleFrame_->SetPosition(leftFrame_->GetPosition() + IntVector2(leftFrame_->GetWidth(), 0));
 			leftFrame_->SetFixedHeight(minitoolheight);
 			if (rightFrame_->IsVisible())
 			{
 				rightFrame_->SetFixedHeight(minitoolheight);
-				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - leftFrame_->GetWidth() - rightFrame_->GetWidth());
+				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - leftFrame_->GetWidth() - rightFrame_->GetWidth() - miniToolbar_->GetWidth());
 				rightFrame_->SetPosition(middleFrame_->GetPosition() + IntVector2(middleFrame_->GetWidth(), 0));
 			}
 			else
-				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - leftFrame_->GetWidth());
+				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - leftFrame_->GetWidth() - miniToolbar_->GetWidth());
 		}
 		else
 		{
-
-			middleFrame_->SetPosition(0, 0);
+			if (miniToolbar_->IsVisible())
+				middleFrame_->SetPosition(miniToolbar_->GetPosition() + IntVector2(miniToolbar_->GetWidth(), 0));
+			else
+				middleFrame_->SetPosition(IntVector2::ZERO);
 
 			if (rightFrame_->IsVisible())
 			{
 				rightFrame_->SetFixedHeight(minitoolheight);
-				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - rightFrame_->GetWidth());
+				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - rightFrame_->GetWidth() - miniToolbar_->GetWidth());
 				rightFrame_->SetPosition(middleFrame_->GetPosition() + IntVector2(middleFrame_->GetWidth(), 0));
 			}
 			else
-				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth());
+				middleFrame_->SetWidth(ui_->GetRoot()->GetWidth() - miniToolbar_->GetWidth());
 		}
-
 	}
 
 	void EditorView::SetToolBarVisible(bool enable)
@@ -229,6 +232,17 @@ namespace Urho3D
 		return rightFrame_->IsVisible();
 	}
 
+// 	void EditorView::SetMiniToolBarVisible(bool enable)
+// 	{
+// 		miniToolbar_->SetVisible(enable);
+// 		UpdateLayout();
+// 	}
+// 
+// 	bool EditorView::IsMiniToolBarVisible() const
+// 	{
+// 		return miniToolbar_->IsVisible();
+// 	}
+
 	TabWindow* EditorView::GetLeftFrame()
 	{
 		return leftFrame_;
@@ -249,9 +263,13 @@ namespace Urho3D
 		return toolbar_;
 	}
 
+	MiniToolBarUI* EditorView::GetMiniToolBar()
+	{
+		return miniToolbar_;
+	}
+
 	MenuBarUI* EditorView::GetGetMenuBar()
 	{
 		return menubar_;
 	}
-
 }

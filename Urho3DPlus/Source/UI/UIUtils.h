@@ -93,5 +93,9 @@ namespace Urho3D
 		UIElement*	CreateStringAttributeEditor(ListView* list, Vector<Serializable*>& serializables, const AttributeInfo& info, unsigned int index, unsigned int subIndex);
 		UIElement*	CreateNumAttributeEditor(ListView* list, Vector<Serializable*>& serializables, const AttributeInfo& info, unsigned int index, unsigned int subIndex);
 		UIElement*	CreateIntAttributeEditor(ListView* list, Vector<Serializable*>& serializables, const AttributeInfo& info, unsigned int index, unsigned int subIndex);
+	
+		/// scene Editor, menu bar actions
+		String ExtractFileName(VariantMap& eventData, bool forSave = false);
+
 	}
 }

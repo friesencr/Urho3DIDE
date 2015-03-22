@@ -21,6 +21,8 @@ namespace Urho3D
 	class Window;
 	class Text;
 	class ScrollBar;
+	class CheckBox;
+
 	/// \todo use dirty masks
 	class ToolBarUI : public BorderImage
 	{
@@ -32,8 +34,8 @@ namespace Urho3D
 		static ToolBarUI* Create(UIElement* context, const String& idname, XMLFile* iconStyle, const String& baseStyle ="ToolBarToggle", int width = 0, int height = 41, XMLFile* defaultstyle = NULL);
 
 		UIElement*	CreateGroup( const String& name, LayoutMode layoutmode);
-		UIElement*	CreateToolBarToggle(const String& groupname, const String& title);
-		UIElement*	CreateToolBarToggle(const String& title);
+		CheckBox*	CreateToolBarToggle(const String& groupname, const String& title);
+		CheckBox*	CreateToolBarToggle(const String& title);
 		UIElement*	CreateToolBarIcon(UIElement* element);
 		UIElement*	CreateToolTip(UIElement* parent, const String& title, const IntVector2& offset);
 		UIElement*  CreateToolBarSpacer(int width);

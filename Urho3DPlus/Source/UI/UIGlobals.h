@@ -37,6 +37,21 @@ namespace Urho3D
 	const StringHash A_SHOWATTRIBUTE_VAR("ShowAttributeAction");
 	const StringHash A_SHOWHIERARCHY_VAR("ShowHierarchyAction");
 
+	const StringHash A_NEWSCENE_VAR("NewScene");
+	const StringHash A_OPENSCENE_VAR("OpenScene");
+	const StringHash A_SAVESCENE_VAR("SaveScene");
+	const StringHash A_SAVESCENEAS_VAR("SaveSceneAs");
+
+	const StringHash A_LOADNODEASREP_VAR("LoadNodeAsRep");
+	const StringHash A_LOADNODEASLOCAL_VAR("LoadNodeAsLocal");
+	const StringHash A_SAVENODEAS_VAR("SaveNodeAs");
+
+	const StringHash A_CREATELOCALNODE_VAR("CreateLocalNode");
+	const StringHash A_CREATEREPNODE_VAR("CreateRepNode");
+
+	const StringHash A_CREATECOMPONENT_VAR("CreateComponent");
+	const StringHash A_CREATEBUILTINOBJ_VAR("CreateBuiltinObject");
+	
 	const int PICK_GEOMETRIES = 0;
 	const int PICK_LIGHTS = 1;
 	const int PICK_ZONES = 2;

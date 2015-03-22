@@ -45,6 +45,25 @@
 #include "../Resource/XMLFile.h"
 #include "../Core/StringUtils.h"
 #include "../Math/Quaternion.h"
+#include "MenuBarUI.h"
+#include "../UI/Menu.h"
+#include "../UI/MessageBox.h"
+#include "Editor.h"
+#include "HierarchyWindow.h"
+#include "../UI/FileSelector.h"
+#include "../IO/FileSystem.h"
+#include "../IO/Log.h"
+#include "AttributeInspector.h"
+#include "../IO/File.h"
+#include "../IO/Deserializer.h"
+#include "../UI/Menu.h"
+#include "../Graphics/StaticModel.h"
+#include "../Graphics/Model.h"
+#include "MiniToolBarUI.h"
+#include "../UI/Button.h"
+#include "ToolBarUI.h"
+#include "../UI/CheckBox.h"
+#include "GizmoScene3D.h"
 
 namespace Urho3D
 {
@@ -83,16 +102,20 @@ namespace Urho3D
 
 	EPScene3D::EPScene3D(Context* context) : EditorPlugin(context),
 		showGrid_(true),
-		grid2DMode_(false)
+		grid2DMode_(false),
+		sceneModified(false)
 	{
 		ui_ = GetSubsystem<UI>();
 		input_ = GetSubsystem<Input>();
 		cache_ = GetSubsystem<ResourceCache>();
 		renderer = GetSubsystem<Renderer>();
+		fileSystem_ = GetSubsystem<FileSystem>();
 
 		editorView_ = GetSubsystem<EditorView>();
 		editorData_ = GetSubsystem<EditorData>();
 		editorSelection_ = GetSubsystem<EditorSelection>();
+		if (editorData_)
+			editor_ = editorData_->GetEditor();
 
 		gridColor = Color(0.1f, 0.1f, 0.1f);
 		gridSubdivisionColor = Color(0.05f, 0.05f, 0.05f);
@@ -102,6 +125,7 @@ namespace Urho3D
 
 		toggledMouseLock_ = false;
 		mouseOrbitMode = ORBIT_RELATIVE;
+		instantiateMode = REPLICATED;
 	}
 
 	EPScene3D::~EPScene3D()
@@ -110,7 +134,7 @@ namespace Urho3D
 
 	void EPScene3D::RegisterObject(Context* context)
 	{
-		context->RegisterFactory<EPScene3D>("EditorPlugin");
+		context->RegisterFactory<EPScene3D>();
 	}
 
 	bool EPScene3D::HasMainScreen()
@@ -126,7 +150,8 @@ namespace Urho3D
 	void EPScene3D::Edit(Object *object)
 	{
 		if (Component::GetTypeStatic() == object->GetBaseType())
-			return;
+		{
+		}
 
 		if (Node::GetTypeStatic() == object->GetBaseType())
 		{
@@ -162,7 +187,15 @@ namespace Urho3D
 		if (window_)
 		{
 			window_->SetVisible(visible);
+			sceneMenu_->SetVisible(visible);
+			createMenu_->SetVisible(visible);
 
+			for (unsigned i = 0; i < miniToolBarButtons_.Size(); i++)
+				miniToolBarButtons_[i]->SetVisible(visible);
+			
+			for (unsigned i = 0; i < toolBarToggles.Size(); i++)		
+				toolBarToggles[i]->SetVisible(visible);
+					
 			if (visible)
 			{
 				SubscribeToEvent(E_POSTRENDERUPDATE, HANDLER(EPScene3D, HandlePostRenderUpdate));
@@ -173,6 +206,7 @@ namespace Urho3D
 				SubscribeToEvent(E_ENDVIEWUPDATE, HANDLER(EPScene3D, HandleEndViewUpdate));
 				SubscribeToEvent(E_BEGINVIEWRENDER, HANDLER(EPScene3D, HandleBeginViewRender));
 				SubscribeToEvent(E_ENDVIEWRENDER, HANDLER(EPScene3D, HandleEndViewRender));
+				gizmo_->ShowGizmo();
 			}
 			else
 			{
@@ -183,7 +217,8 @@ namespace Urho3D
 				UnsubscribeFromEvent(E_BEGINVIEWUPDATE);
 				UnsubscribeFromEvent(E_ENDVIEWUPDATE);
 				UnsubscribeFromEvent(E_BEGINVIEWRENDER);
-				UnsubscribeFromEvent(E_ENDVIEWRENDER);
+				UnsubscribeFromEvent(E_ENDVIEWRENDER); 
+				gizmo_->HideGizmo();
 			}
 		}
 	}
@@ -191,6 +226,14 @@ namespace Urho3D
 	void EPScene3D::Update(float timeStep)
 	{
 		UpdateStats(timeStep);
+
+		if (runUpdate)
+			editorData_->GetEditorScene()->Update(timeStep);
+
+		if (toolBarDirty && editorView_->IsToolBarVisible())
+			UpdateToolBar();
+
+		gizmo_->UpdateGizmo();
 
 		if (ui_->HasModalElement() || ui_->GetFocusElement() != NULL)
 		{
@@ -331,8 +374,8 @@ namespace Urho3D
 				break;
 			}
 
-// 			if (moved)
-// 				UpdateNodeAttributes();
+			// 			if (moved)
+			// 				UpdateNodeAttributes();
 		}
 	}
 
@@ -410,6 +453,14 @@ namespace Urho3D
 		renderStatsText->SetSize(renderStatsText->GetMinSize());
 	}
 
+	void EPScene3D::SetFillMode(FillMode fM_)
+	{
+		fillMode = fM_;
+// 		for (uint i = 0; i < viewports.length; ++i)
+// 			viewports[i].camera.fillMode = fillMode_;
+		camera_->SetFillMode(fM_);
+	}
+
 	void EPScene3D::Start()
 	{
 		EditorData* editorData_ = GetSubsystem<EditorData>();
@@ -422,12 +473,301 @@ namespace Urho3D
 		activeView->CreateViewportContextUI(editorData_->GetDefaultStyle(), editorData_->GetIconStyle());
 		cameraNode_ = activeView->GetCameraNode();
 		camera_ = activeView->GetCamera();
+		activeView->SetAutoUpdate(true);
 
 		CreateGrid();
 		ShowGrid();
 		CreateStatsBar();
 
 		SubscribeToEvent(window_, E_RESIZED, HANDLER(EPScene3D, HandleResizeView));
+
+		//////////////////////////////////////////////////////////////////////////
+		/// Menu Bar entries
+
+		sceneMenu_ = editorView_->GetGetMenuBar()->CreateMenu("Scene");
+		editorView_->GetGetMenuBar()->CreateMenuItem("Scene", "New scene", A_NEWSCENE_VAR, 'N', QUAL_SHIFT | QUAL_CTRL);
+		editorView_->GetGetMenuBar()->CreateMenuItem("Scene", "Open scene...", A_OPENSCENE_VAR, 'O', QUAL_CTRL);
+		editorView_->GetGetMenuBar()->CreateMenuItem("Scene", "Save scene", A_SAVESCENE_VAR, 'S', QUAL_CTRL);
+		editorView_->GetGetMenuBar()->CreateMenuItem("Scene", "Save scene as...", A_SAVESCENEAS_VAR, 'S', QUAL_SHIFT | QUAL_CTRL);
+
+		editorView_->GetGetMenuBar()->CreateMenuItem("Scene", "Load node as replicated", A_LOADNODEASREP_VAR);
+		editorView_->GetGetMenuBar()->CreateMenuItem("Scene", "Load node as local", A_LOADNODEASLOCAL_VAR);
+		editorView_->GetGetMenuBar()->CreateMenuItem("Scene", "Save node as", A_SAVENODEAS_VAR);
+
+		createMenu_ = editorView_->GetGetMenuBar()->CreateMenu("Create");
+
+		editorView_->GetGetMenuBar()->CreateMenuItem("Create", "Replicated node", A_CREATEREPNODE_VAR, 0, 0, true, "Create Replicated node");
+		editorView_->GetGetMenuBar()->CreateMenuItem("Create", "Local node", A_CREATELOCALNODE_VAR, 0, 0, true, "Create Local node");
+
+		Menu* childMenu = editorView_->GetGetMenuBar()->CreateMenuItem("Create", "Component", StringHash::ZERO, SHOW_POPUP_INDICATOR);
+		Window* childPopup = editorView_->GetGetMenuBar()->CreatePopupMenu(childMenu);
+
+		const HashMap<String, Vector<StringHash> >& objectCategories = context_->GetObjectCategories();
+		HashMap<String, Vector<StringHash> >::ConstIterator it;
+
+		/// Mini Tool Bar entries 
+		/// \todo create scroll bar for the mini tool bar or something ... because there are to many components that can be added this way 
+// 		MiniToolBarUI* minitool = editorView_->GetMiniToolBar();
+// 		Button* b = (Button*)minitool->CreateSmallToolBarButton("Node", "Replicated Node");
+// 		miniToolBarButtons_.Push(b);
+// 		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateReplNode));
+// 		b = (Button*)minitool->CreateSmallToolBarButton("Node", "Local Node");
+// 		miniToolBarButtons_.Push(b);
+// 		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateLocalNode));
+		
+
+		for (it = objectCategories.Begin(); it != objectCategories.End(); it++)
+		{
+			// Skip the UI category for the component menus
+			if (it->first_ == "UI")
+				continue;
+
+			Menu* menu = editorView_->GetGetMenuBar()->CreatePopupMenuItem(childPopup, it->first_, StringHash::ZERO, SHOW_POPUP_INDICATOR);
+			Window* popup = editorView_->GetGetMenuBar()->CreatePopupMenu(menu);
+
+			/// GetObjectsByCategory
+			Vector<String> components;
+			const HashMap<StringHash, SharedPtr<ObjectFactory> >& factories = context_->GetObjectFactories();
+			const Vector<StringHash>& factoryHashes = it->second_;
+			components.Reserve(factoryHashes.Size());
+			for (unsigned j = 0; j < factoryHashes.Size(); ++j)
+			{
+				HashMap<StringHash, SharedPtr<ObjectFactory> >::ConstIterator k = factories.Find(factoryHashes[j]);
+				if (k != factories.End())
+					components.Push(k->second_->GetTypeName());
+			}
+			//minitool->CreateSmallToolBarSpacer(3);
+			/// \todo CreateIconizedMenuItem
+			for (unsigned j = 0; j < components.Size(); ++j)
+			{
+				editorView_->GetGetMenuBar()->CreatePopupMenuItem(popup, components[j], A_CREATECOMPONENT_VAR);
+				/// Mini Tool Bar entries
+// 				b = (Button*)minitool->CreateSmallToolBarButton(components[j]);
+// 				miniToolBarButtons_.Push(b);
+			}
+				
+		}
+
+		childMenu = editorView_->GetGetMenuBar()->CreateMenuItem("Create", "Builtin object", StringHash::ZERO, SHOW_POPUP_INDICATOR);
+		childPopup = editorView_->GetGetMenuBar()->CreatePopupMenu(childMenu);
+		String objects[] = { "Box", "Cone", "Cylinder", "Plane", "Pyramid", "Sphere", "TeaPot", "Torus" };
+		for (int i = 0; i < 8; i++)
+		{
+			editorView_->GetGetMenuBar()->CreatePopupMenuItem(childPopup, objects[i], A_CREATEBUILTINOBJ_VAR);
+		}
+
+		SubscribeToEvent(editorView_->GetGetMenuBar(), E_MENUBAR_ACTION, HANDLER(EPScene3D, HandleMenuBarAction));
+
+		
+		/// Mini Tool Bar entries
+		CreateMiniToolBarUI();
+
+		/// Tool Bar entries
+		CreateToolBarUI();
+
+		/// create gizmo
+
+		gizmo_ = new GizmoScene3D(context_, this);
+
+		gizmo_->CreateGizmo();
+		gizmo_->ShowGizmo();
+	}
+
+	void EPScene3D::CreateMiniToolBarUI()
+	{
+
+		MiniToolBarUI* minitool = editorView_->GetMiniToolBar();
+
+		Button* b = (Button*)minitool->CreateSmallToolBarButton("Node", "Replicated Node");
+		miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateReplNode));
+		b = (Button*)minitool->CreateSmallToolBarButton("Node", "Local Node");
+		miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateLocalNode));
+
+		minitool->CreateSmallToolBarSpacer(3);
+		b = (Button*)minitool->CreateSmallToolBarButton("Light");
+		miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("Camera");
+		miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("Zone");
+		miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("StaticModel");
+		miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("AnimatedModel"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("BillboardSet"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("ParticleEmitter"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("Skybox"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("Terrain"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("Text3D"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+
+		minitool->CreateSmallToolBarSpacer(3);
+		b = (Button*)minitool->CreateSmallToolBarButton("SoundListener"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("SoundSource3D"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("SoundSource"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+
+		minitool->CreateSmallToolBarSpacer(3);
+		b = (Button*)minitool->CreateSmallToolBarButton("RigidBody"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("CollisionShape"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("Constraint"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+
+		minitool->CreateSmallToolBarSpacer(3);
+		b = (Button*)minitool->CreateSmallToolBarButton("AnimationController"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("ScriptInstance"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+
+		minitool->CreateSmallToolBarSpacer(3);
+		b = (Button*)minitool->CreateSmallToolBarButton("Navigable"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("NavigationMesh"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		b = (Button*)minitool->CreateSmallToolBarButton("OffMeshConnection"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+		minitool->CreateSmallToolBarSpacer(3);
+		b = (Button*)minitool->CreateSmallToolBarButton("NetworkPriority"); miniToolBarButtons_.Push(b);
+		SubscribeToEvent(b, E_RELEASED, HANDLER(EPScene3D, MiniToolBarCreateComponent));
+	}
+
+	void EPScene3D::CreateToolBarUI()
+	{
+
+		ToolBarUI* minitool = editorView_->GetToolBar();
+
+
+		UIElement* e = minitool->CreateGroup("RunUpdateGroup", LM_HORIZONTAL);
+		toolBarToggles.Push(e);
+		CheckBox* checkbox = minitool->CreateToolBarToggle("RunUpdateGroup", "RunUpdatePlay");
+		if (checkbox->IsChecked() != runUpdate)
+			checkbox->SetChecked(runUpdate);
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D,ToolBarRunUpdatePlay));
+		checkbox = minitool->CreateToolBarToggle("RunUpdateGroup", "RunUpdatePause");
+		if (checkbox->IsChecked() != (runUpdate == false))
+			checkbox->SetChecked(runUpdate == false);
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarRunUpdatePause));
+		checkbox = minitool->CreateToolBarToggle("RunUpdateGroup", "RevertOnPause");
+		if (checkbox->IsChecked() != revertOnPause)
+			checkbox->SetChecked(revertOnPause);
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarRevertOnPause));
+		minitool->CreateToolBarSpacer(4);
+
+
+
+		e = minitool->CreateGroup("EditModeGroup", LM_HORIZONTAL);
+		toolBarToggles.Push(e);
+		checkbox = minitool->CreateToolBarToggle("EditModeGroup", "EditMove");
+		if (checkbox->IsChecked() != (editMode == EDIT_MOVE))
+			checkbox->SetChecked(editMode == EDIT_MOVE);
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarEditModeMove));
+		checkbox = minitool->CreateToolBarToggle("EditModeGroup", "EditRotate");
+		if (checkbox->IsChecked() != (editMode == EDIT_ROTATE))
+			checkbox->SetChecked(editMode == EDIT_ROTATE);
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarEditModeRotate));
+		checkbox = minitool->CreateToolBarToggle("EditModeGroup", "EditScale");
+		if (checkbox->IsChecked() != (editMode == EDIT_SCALE))
+			checkbox->SetChecked(editMode == EDIT_SELECT);
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarEditModeScale));
+		checkbox = minitool->CreateToolBarToggle("EditModeGroup", "EditSelect");
+		if (checkbox->IsChecked() != (editMode == EDIT_SELECT))
+			checkbox->SetChecked(editMode == EDIT_SELECT);
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarEditModeSelect));
+
+		e = minitool->CreateGroup("AxisModeGroup", LM_HORIZONTAL);
+		toolBarToggles.Push(e);
+		checkbox = minitool->CreateToolBarToggle("AxisModeGroup", "AxisWorld");
+		if (checkbox->IsChecked() != (axisMode == AXIS_WORLD))
+			checkbox->SetChecked(axisMode == AXIS_WORLD);
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarAxisModeWorld));
+		checkbox = minitool->CreateToolBarToggle("AxisModeGroup", "AxisLocal");
+		if (checkbox->IsChecked() != (axisMode == AXIS_LOCAL))
+			checkbox->SetChecked((axisMode == AXIS_LOCAL));
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarAxisModeLocal));
+
+		minitool->CreateToolBarSpacer(4);
+		checkbox = minitool->CreateToolBarToggle("MoveSnap");
+		if (checkbox->IsChecked() != moveSnap)
+			checkbox->SetChecked(moveSnap);
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarMoveSnap));
+		toolBarToggles.Push(checkbox);
+		checkbox = minitool->CreateToolBarToggle("RotateSnap");
+		if (checkbox->IsChecked() != rotateSnap)
+			checkbox->SetChecked(rotateSnap);
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarRotateSnap));
+		toolBarToggles.Push(checkbox);
+		checkbox = minitool->CreateToolBarToggle("ScaleSnap");
+		if (checkbox->IsChecked() != scaleSnap)
+			checkbox->SetChecked(scaleSnap);
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarScaleSnap));
+		toolBarToggles.Push(checkbox);
+
+		e = minitool->CreateGroup("SnapScaleModeGroup", LM_HORIZONTAL);
+		toolBarToggles.Push(e);
+		checkbox = minitool->CreateToolBarToggle("SnapScaleModeGroup", "SnapScaleHalf");
+		if (checkbox->IsChecked() != (snapScaleMode == SNAP_SCALE_HALF))
+			checkbox->SetChecked((snapScaleMode == SNAP_SCALE_HALF));
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarSnapScaleModeHalf));
+		checkbox = minitool->CreateToolBarToggle("SnapScaleModeGroup", "SnapScaleQuarter");
+		if (checkbox->IsChecked() != (snapScaleMode == SNAP_SCALE_QUARTER))
+			checkbox->SetChecked((snapScaleMode == SNAP_SCALE_QUARTER));
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarSnapScaleModeQuarter));
+
+		minitool->CreateToolBarSpacer(4);
+		e = minitool->CreateGroup("PickModeGroup", LM_HORIZONTAL);
+		toolBarToggles.Push(e);
+		checkbox = minitool->CreateToolBarToggle("PickModeGroup", "PickGeometries");
+		if (checkbox->IsChecked() != (pickMode == PICK_GEOMETRIES))
+			checkbox->SetChecked((pickMode == PICK_GEOMETRIES));
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarPickModeGeometries));
+		checkbox = minitool->CreateToolBarToggle("PickModeGroup", "PickLights");
+		if (checkbox->IsChecked() != (pickMode == PICK_LIGHTS))
+			checkbox->SetChecked((pickMode == PICK_LIGHTS));
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarPickModeLights));
+		checkbox = minitool->CreateToolBarToggle("PickModeGroup", "PickZones");
+		if (checkbox->IsChecked() != (pickMode == PICK_ZONES))
+			checkbox->SetChecked((pickMode == PICK_ZONES));
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarPickModeZones));
+		checkbox = minitool->CreateToolBarToggle("PickModeGroup", "PickRigidBodies");
+		if (checkbox->IsChecked() != (pickMode == PICK_RIGIDBODIES))
+			checkbox->SetChecked((pickMode == PICK_RIGIDBODIES));
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarPickModeRigidBodies));
+		checkbox = minitool->CreateToolBarToggle("PickModeGroup", "PickUIElements");
+		if (checkbox->IsChecked() != (pickMode == PICK_UI_ELEMENTS))
+			checkbox->SetChecked((pickMode == PICK_UI_ELEMENTS));
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarPickModeUIElements));
+
+		minitool->CreateToolBarSpacer(4);
+		e = minitool->CreateGroup("FillModeGroup", LM_HORIZONTAL);
+		toolBarToggles.Push(e);
+		checkbox = minitool->CreateToolBarToggle("FillModeGroup", "FillPoint");
+		if (checkbox->IsChecked() != (fillMode == FILL_POINT))
+			checkbox->SetChecked((fillMode == FILL_POINT));
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarFillModePoint));
+		checkbox = minitool->CreateToolBarToggle("FillModeGroup", "FillWireFrame");
+		if (checkbox->IsChecked() != (fillMode == FILL_WIREFRAME))
+			checkbox->SetChecked((fillMode == FILL_WIREFRAME));
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarFillModeWireFrame));
+		checkbox = minitool->CreateToolBarToggle("FillModeGroup", "FillSolid");
+		if (checkbox->IsChecked() != (fillMode == FILL_SOLID))
+			checkbox->SetChecked((fillMode == FILL_SOLID));
+		SubscribeToEvent(checkbox, E_TOGGLED, HANDLER(EPScene3D, ToolBarFillModeSolid));
+
+
 	}
 
 	Urho3D::Vector3 EPScene3D::SelectedNodesCenterPoint()
@@ -478,7 +818,7 @@ namespace Urho3D
 
 		if (adjust.Length() > M_EPSILON)
 		{
-			for (unsigned int i = 0; i <editorSelection_->GetNumEditNodes(); ++i)
+			for (unsigned int i = 0; i < editorSelection_->GetNumEditNodes(); ++i)
 			{
 				if (moveSnap)
 				{
@@ -499,7 +839,7 @@ namespace Urho3D
 				worldPos += nodeAdjust;
 
 				if (node->GetParent() == NULL)
-					node->SetPosition( worldPos);
+					node->SetPosition(worldPos);
 				else
 					node->SetPosition(node->GetParent()->WorldToLocal(worldPos));
 
@@ -532,7 +872,7 @@ namespace Urho3D
 				Node* node = editorSelection_->GetEditNodes()[i];
 				Quaternion rotQuat(adjust.x_, adjust.y_, adjust.z_);
 				if (axisMode == AXIS_LOCAL && editorSelection_->GetNumEditNodes() == 1)
-					node->SetRotation( node->GetRotation() * rotQuat);
+					node->SetRotation(node->GetRotation() * rotQuat);
 				else
 				{
 					Vector3 offset = node->GetWorldPosition();/// \todo -gizmoAxisX.axisRay.origin;
@@ -541,12 +881,12 @@ namespace Urho3D
 						rotQuat = node->GetParent()->GetWorldRotation().Inverse() * rotQuat * node->GetParent()->GetWorldRotation();
 
 					node->SetRotation(rotQuat * node->GetRotation());
-					Vector3 newPosition =  rotQuat * offset; /// \todo gizmoAxisX.axisRay.origin +
+					Vector3 newPosition = rotQuat * offset; /// \todo gizmoAxisX.axisRay.origin +
 
 					if (node->GetParent() != NULL)
 						newPosition = node->GetParent()->WorldToLocal(newPosition);
 
-					node->SetPosition( newPosition);
+					node->SetPosition(newPosition);
 				}
 			}
 		}
@@ -560,7 +900,7 @@ namespace Urho3D
 
 		if (adjust.Length() > M_EPSILON)
 		{
-			for (unsigned int i = 0; i <editorSelection_->GetNumEditNodes(); ++i)
+			for (unsigned int i = 0; i < editorSelection_->GetNumEditNodes(); ++i)
 			{
 				Node* node = editorSelection_->GetEditNodes()[i];
 
@@ -592,7 +932,7 @@ namespace Urho3D
 				if (scale != oldScale)
 					moved = true;
 
-				node->SetScale( scale);
+				node->SetScale(scale);
 			}
 		}
 
@@ -718,7 +1058,816 @@ namespace Urho3D
 	void EPScene3D::HandleResizeView(StringHash eventType, VariantMap& eventData)
 	{
 		if (activeView)
-			activeView->SetSize(window_->GetSize());		
+			activeView->SetSize(window_->GetSize());
+	}
+
+	void EPScene3D::HandleMenuBarAction(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace MenuBarAction;
+
+		StringHash action = eventData[P_ACTION].GetStringHash();
+		if (action == A_NEWSCENE_VAR)
+		{
+			ResetScene();
+		}
+		else if (action == A_OPENSCENE_VAR)
+		{
+			editor_->CreateFileSelector("Open scene", "Open", "Cancel", editorData_->uiScenePath, editorData_->uiSceneFilters, editorData_->uiSceneFilter);
+			SubscribeToEvent(editor_->GetUIFileSelector(), E_FILESELECTED, HANDLER(EPScene3D, HandleOpenSceneFile));
+		}
+		else if (action == A_SAVESCENE_VAR || action == A_SAVESCENEAS_VAR)
+		{
+			editor_->CreateFileSelector("Save scene as", "Save", "Cancel", editorData_->uiScenePath, editorData_->uiSceneFilters, editorData_->uiSceneFilter);
+			editor_->GetUIFileSelector()->SetFileName(GetFileNameAndExtension(editorData_->GetEditorScene()->GetFileName()));
+			SubscribeToEvent(editor_->GetUIFileSelector(), E_FILESELECTED, HANDLER(EPScene3D, HandleSaveSceneFile));
+		}
+		else if (action == A_LOADNODEASREP_VAR)
+		{
+			instantiateMode = REPLICATED;
+			editor_->CreateFileSelector("Load node", "Load", "Cancel", editorData_->uiNodePath, editorData_->uiSceneFilters, editorData_->uiNodeFilter);
+			SubscribeToEvent(editor_->GetUIFileSelector(), E_FILESELECTED, HANDLER(EPScene3D, HandleLoadNodeFile));
+		}
+		else if (action == A_LOADNODEASLOCAL_VAR)
+		{
+			instantiateMode = LOCAL;
+			editor_->CreateFileSelector("Load node", "Load", "Cancel", editorData_->uiNodePath, editorData_->uiSceneFilters, editorData_->uiNodeFilter);
+			SubscribeToEvent(editor_->GetUIFileSelector(), E_FILESELECTED, HANDLER(EPScene3D, HandleLoadNodeFile));
+		}
+		else if (action == A_SAVENODEAS_VAR)
+		{
+			if (editorSelection_->GetEditNode() != NULL && editorSelection_->GetEditNode() != editorData_->GetEditorScene())
+			{
+				editor_->CreateFileSelector("Save node", "Save", "Cancel", editorData_->uiNodePath, editorData_->uiSceneFilters, editorData_->uiNodeFilter);
+				editor_->GetUIFileSelector()->SetFileName(GetFileNameAndExtension(instantiateFileName));
+				SubscribeToEvent(editor_->GetUIFileSelector(), E_FILESELECTED, HANDLER(EPScene3D, HandleSaveNodeFile));
+			}
+		}
+		else if (action == A_CREATEREPNODE_VAR)
+		{
+			CreateNode(REPLICATED);
+		}
+		else if (action == A_CREATELOCALNODE_VAR)
+		{
+			CreateNode(LOCAL);
+		}
+		else if (action == A_CREATECOMPONENT_VAR)
+		{
+			String uiname = eventData[P_UINAME].GetString();
+			CreateComponent(uiname);
+		}
+		else if (action == A_CREATEBUILTINOBJ_VAR)
+		{
+			String uiname = eventData[P_UINAME].GetString();
+			CreateBuiltinObject(uiname);
+		}
+	}
+
+	void EPScene3D::HandleMessageAcknowledgement(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace MessageACK;
+
+		if (eventData[P_OK].GetBool())
+		{
+			sceneModified = false;
+			ResetScene();
+		}
+	}
+
+	bool EPScene3D::ResetScene()
+	{
+		ui_->GetCursor()->SetShape(CS_BUSY);
+
+		if (sceneModified)
+		{
+			SharedPtr<MessageBox> messageBox(new MessageBox(context_, "Scene has been modified.\nContinue to reset?", "Warning"));
+			messageBox->AddRef();
+			if (messageBox->GetWindow() != NULL)
+			{
+				Button* cancelButton = (Button*)messageBox->GetWindow()->GetChild("CancelButton", true);
+				cancelButton->SetVisible(true);
+				cancelButton->SetFocus(true);
+				SubscribeToEvent(messageBox, E_MESSAGEACK, HANDLER(EPScene3D, HandleMessageAcknowledgement));
+
+				return false;
+			}
+		}
+
+		// Clear stored script attributes
+		//scriptAttributes.Clear();
+
+		Editor* editor = editorData_->GetEditor();
+		editor->GetHierarchyWindow()->SetSuppressSceneChanges(true);
+
+		// Create a scene with default values, these will be overridden when loading scenes
+		editorData_->GetEditorScene()->Clear();
+		editorData_->GetEditorScene()->CreateComponent<Octree>();
+		editorData_->GetEditorScene()->CreateComponent<DebugRenderer>();
+
+		// Release resources that became unused after the scene clear
+		//cache.ReleaseAllResources(false);
+
+		sceneModified = false;
+		revertData = NULL;
+		StopSceneUpdate();
+
+		//		UpdateWindowTitle();
+		//		DisableInspectorLock();
+		editor->GetHierarchyWindow()->UpdateHierarchyItem(editorData_->GetEditorScene(), true);
+		//		ClearEditActions();
+
+		editor->GetHierarchyWindow()->SetSuppressSceneChanges(false);
+
+		ResetCamera();
+		//	CreateGizmo();
+		CreateGrid();
+		//	SetActiveViewport(viewports[0]);
+
+		return true;
+	}
+
+	void EPScene3D::HandleOpenSceneFile(StringHash eventType, VariantMap& eventData)
+	{
+		editor_->CloseFileSelector(editorData_->uiSceneFilter, editorData_->uiScenePath);
+		LoadScene(UIUtils::ExtractFileName(eventData));
+	}
+
+	void EPScene3D::HandleSaveSceneFile(StringHash eventType, VariantMap& eventData)
+	{
+		editor_->CloseFileSelector(editorData_->uiSceneFilter, editorData_->uiScenePath);
+		SaveScene(UIUtils::ExtractFileName(eventData, true));
+	}
+
+	void EPScene3D::HandleLoadNodeFile(StringHash eventType, VariantMap& eventData)
+	{
+		editor_->CloseFileSelector(editorData_->uiSceneFilter, editorData_->uiScenePath);
+		LoadNode(UIUtils::ExtractFileName(eventData));
+	}
+
+	void EPScene3D::HandleSaveNodeFile(StringHash eventType, VariantMap& eventData)
+	{
+		editor_->CloseFileSelector(editorData_->uiSceneFilter, editorData_->uiScenePath);
+		SaveNode(UIUtils::ExtractFileName(eventData, true));
+	}
+
+	bool EPScene3D::LoadScene(const String& fileName)
+	{
+		if (fileName.Empty())
+			return false;
+
+		ui_->GetCursor()->SetShape(CS_BUSY);
+
+		// Always load the scene from the filesystem, not from resource paths
+		if (!fileSystem_->FileExists(fileName))
+		{
+			LOGERRORF("No such scene %s", fileName.CString());
+
+			MessageBox(context_, "No such scene.\n" + fileName);
+			return false;
+		}
+
+		File file(context_);
+		if (!file.Open(fileName, FILE_READ))
+		{
+			LOGERRORF("Could not open file %s", fileName.CString());
+
+			MessageBox(context_, "Could not open file.\n" + fileName);
+			return false;
+		}
+
+		// Reset stored script attributes.
+		// 	scriptAttributes.Clear();
+		//
+		// 	// Add the scene's resource path in case it's necessary
+		// 	String newScenePath = GetPath(fileName);
+		// 	if (!rememberResourcePath || !sceneResourcePath.StartsWith(newScenePath, false))
+		// 		SetResourcePath(newScenePath);
+
+		editor_->GetHierarchyWindow()->SetSuppressSceneChanges(true);
+		sceneModified = false;
+		revertData = NULL;
+		StopSceneUpdate();
+
+		String extension = GetExtension(fileName);
+		bool loaded;
+		if (extension != ".xml")
+			loaded = editorData_->GetEditorScene()->Load(file);
+		else
+			loaded = editorData_->GetEditorScene()->LoadXML(file);
+
+		// Release resources which are not used by the new scene
+		/// \todo this creates an bug in the attribute inspector because the loaded xml files are released
+		cache_->ReleaseAllResources(false);
+
+		// Always pause the scene, and do updates manually
+		editorData_->GetEditorScene()->SetUpdateEnabled(false);
+
+		// 	UpdateWindowTitle();
+		// 	DisableInspectorLock();
+		editor_->GetHierarchyWindow()->UpdateHierarchyItem(editorData_->GetEditorScene(), true);
+		// 	ClearEditActions();
+		//
+
+		editor_->GetHierarchyWindow()->SetSuppressSceneChanges(false);
+		/// \todo
+		editorSelection_->ClearSelection();
+		editor_->GetAttributeWindow()->GetEditNodes() = editorSelection_->GetEditNodes();
+		editor_->GetAttributeWindow()->GetEditComponents() = editorSelection_->GetEditComponents();
+		editor_->GetAttributeWindow()->GetEditUIElements() = editorSelection_->GetEditUIElements();
+		editor_->GetAttributeWindow()->Update();
+		//
+		// 	// global variable to mostly bypass adding mru upon importing tempscene
+		// 	if (!skipMruScene)
+		// 		UpdateSceneMru(fileName);
+		//
+		// 	skipMruScene = false;
+		//
+		ResetCamera();
+		// 	CreateGizmo();
+		CreateGrid();
+		// 	SetActiveViewport(viewports[0]);
+		//
+		// 	// Store all ScriptInstance and LuaScriptInstance attributes
+		// 	UpdateScriptInstances();
+
+		return loaded;
+	}
+
+	bool EPScene3D::SaveScene(const String& fileName)
+	{
+		if (fileName.Empty())
+			return false;
+
+		ui_->GetCursor()->SetShape(CS_BUSY);
+
+		// Unpause when saving so that the scene will work properly when loaded outside the editor
+		editorData_->GetEditorScene()->SetUpdateEnabled(true);
+
+		MakeBackup(fileName);
+		File file(context_, fileName, FILE_WRITE);
+		String extension = GetExtension(fileName);
+		bool success = (extension != ".xml" ? editorData_->GetEditorScene()->Save(file) : editorData_->GetEditorScene()->SaveXML(file));
+		RemoveBackup(success, fileName);
+
+		editorData_->GetEditorScene()->SetUpdateEnabled(false);
+
+		if (success)
+		{
+			//	UpdateSceneMru(fileName);
+			sceneModified = false;
+			//	UpdateWindowTitle();
+		}
+		else
+			MessageBox(context_, "Could not save scene successfully!\nSee Urho3D.log for more detail.");
+
+		return success;
+	}
+
+	Node* EPScene3D::LoadNode(const String& fileName, Node* parent /*= NULL*/)
+	{
+		if (fileName.Empty())
+			return NULL;
+
+		if (!fileSystem_->FileExists(fileName))
+		{
+			MessageBox(context_, "No such node file.\n" + fileName);
+			return NULL;
+		}
+
+		File file(context_);
+		if (!file.Open(fileName, FILE_READ))
+		{
+			MessageBox(context_, "Could not open file.\n" + fileName);
+			return NULL;
+		}
+
+		ui_->GetCursor()->SetShape(CS_BUSY);
+
+		// Before instantiating, add object's resource path if necessary
+		//SetResourcePath(GetPath(fileName), true, true);
+
+		Ray cameraRay = camera_->GetScreenRay(0.5, 0.5); // Get ray at view center
+		Vector3 position, normal;
+		//	GetSpawnPosition(cameraRay, newNodeDistance, position, normal, 0, true);
+
+		Node* newNode = InstantiateNodeFromFile(&file, position, Quaternion(), 1, parent, instantiateMode);
+		if (newNode != NULL)
+		{
+			//FocusNode(newNode);
+			instantiateFileName = fileName;
+		}
+		return newNode;
+	}
+
+	bool EPScene3D::SaveNode(const String& fileName)
+	{
+		if (fileName.Empty())
+			return false;
+
+		ui_->GetCursor()->SetShape(CS_BUSY);
+
+		MakeBackup(fileName);
+
+		File file(context_);
+		if (!file.Open(fileName, FILE_WRITE))
+		{
+			MessageBox(context_, "Could not open file.\n" + fileName);
+			return NULL;
+		}
+
+		String extension = GetExtension(fileName);
+		bool success = (extension != ".xml" ? editorSelection_->GetEditNode()->Save(file) : editorSelection_->GetEditNode()->SaveXML(file));
+		RemoveBackup(success, fileName);
+
+		if (success)
+			instantiateFileName = fileName;
+		else
+			MessageBox(context_, "Could not save node successfully!\nSee Urho3D.log for more detail.");
+
+		return success;
+	}
+
+	Node* EPScene3D::InstantiateNodeFromFile(File* file, const Vector3& position, const Quaternion& rotation, float scaleMod /*= 1.0f*/, Node* parent /*= NULL*/, CreateMode mode /*= REPLICATED*/)
+	{
+		if (file == NULL)
+			return NULL;
+
+		Node* newNode = NULL;
+		unsigned int numSceneComponent = editorData_->GetEditorScene()->GetNumComponents();
+
+		editor_->GetHierarchyWindow()->SetSuppressSceneChanges(true);
+
+		String extension = GetExtension(file->GetName());
+		if (extension != ".xml")
+			newNode = editorData_->GetEditorScene()->Instantiate(*file, position, rotation, mode);
+		else
+			newNode = editorData_->GetEditorScene()->InstantiateXML(*file, position, rotation, mode);
+
+		editor_->GetHierarchyWindow()->SetSuppressSceneChanges(false);
+
+		if (parent != NULL)
+			newNode->SetParent(parent);
+
+		if (newNode != NULL)
+		{
+			newNode->SetScale(newNode->GetScale() * scaleMod);
+			// 			if (alignToAABBBottom)
+			// 			{
+			// 				Drawable@ drawable = GetFirstDrawable(newNode);
+			// 				if (drawable !is null)
+			// 				{
+			// 					BoundingBox aabb = drawable.worldBoundingBox;
+			// 					Vector3 aabbBottomCenter(aabb.center.x, aabb.min.y, aabb.center.z);
+			// 					Vector3 offset = aabbBottomCenter - newNode.worldPosition;
+			// 					newNode.worldPosition = newNode.worldPosition - offset;
+			// 				}
+			// 			}
+
+			// Create an undo action for the load
+			// 			CreateNodeAction action;
+			// 			action.Define(newNode);
+			// 			SaveEditAction(action);
+			// 			SetSceneModified();
+			sceneModified = true;
+
+			if (numSceneComponent != editorData_->GetEditorScene()->GetNumComponents())
+				editor_->GetHierarchyWindow()->UpdateHierarchyItem(editorData_->GetEditorScene());
+			else
+				editor_->GetHierarchyWindow()->UpdateHierarchyItem(newNode);
+		}
+
+		return newNode;
+	}
+
+	Node* EPScene3D::CreateNode(CreateMode mode)
+	{
+		Node* newNode = NULL;
+		if (editorSelection_->GetEditNode() != NULL)
+			newNode = editorSelection_->GetEditNode()->CreateChild("", mode);
+		else
+			newNode = editorData_->GetEditorScene()->CreateChild("", mode);
+		// Set the new node a certain distance from the camera
+		//	newNode.position = GetNewNodePosition();
+
+		// Create an undo action for the create
+		// 		CreateNodeAction action;
+		// 		action.Define(newNode);
+		// 		SaveEditAction(action);
+		// 		SetSceneModified();
+		sceneModified = true;
+
+		//		FocusNode(newNode);
+
+		return newNode;
+	}
+
+	void EPScene3D::CreateComponent(const String& componentType)
+	{
+		// If this is the root node, do not allow to create duplicate scene-global components
+		if (editorSelection_->GetEditNode() == editorData_->GetEditorScene() && CheckForExistingGlobalComponent(editorSelection_->GetEditNode(), componentType))
+			return;
+
+		// Group for storing undo actions
+		//EditActionGroup group;
+
+		// For now, make a local node's all components local
+		/// \todo Allow to specify the createmode
+		for (unsigned int i = 0; i < editorSelection_->GetNumEditNodes(); ++i)
+		{
+			Component* newComponent = editorSelection_->GetEditNodes()[i]->CreateComponent(componentType, editorSelection_->GetEditNodes()[i]->GetID() < FIRST_LOCAL_ID ? REPLICATED : LOCAL);
+			if (newComponent != NULL)
+			{
+				// Some components such as CollisionShape do not create their internal object before the first call to ApplyAttributes()
+				// to prevent unnecessary initialization with default values. Call now
+				newComponent->ApplyAttributes();
+
+				// 				CreateComponentAction action;
+				// 				action.Define(newComponent);
+				// 				group.actions.Push(action);
+			}
+		}
+
+		// 		SaveEditActionGroup(group);
+		// 		SetSceneModified();
+		sceneModified = true;
+
+		// Although the edit nodes selection are not changed, call to ensure attribute inspector notices new components of the edit nodes
+		//	HandleHierarchyListSelectionChange();
+
+		editor_->GetAttributeWindow()->Update();
+	}
+
+	void EPScene3D::CreateBuiltinObject(const String& name)
+	{
+		Node* newNode = editorData_->GetEditorScene()->CreateChild(name, REPLICATED);
+		// Set the new node a certain distance from the camera
+		//	newNode.position = GetNewNodePosition();
+
+		StaticModel* object = newNode->CreateComponent<StaticModel>();
+
+		object->SetModel(cache_->GetResource<Model>("Models/" + name + ".mdl"));
+
+		// Create an undo action for the create
+		// 		CreateNodeAction action;
+		// 		action.Define(newNode);
+		// 		SaveEditAction(action);
+		// 		SetSceneModified();
+
+		sceneModified = true;
+
+		//		FocusNode(newNode);
+	}
+
+	bool EPScene3D::CheckForExistingGlobalComponent(Node* node, const String& typeName)
+	{
+		if (typeName != "Octree" && typeName != "PhysicsWorld" && typeName != "DebugRenderer")
+			return false;
+		else
+			return node->HasComponent(typeName);
+	}
+
+	void EPScene3D::MiniToolBarCreateLocalNode(StringHash eventType, VariantMap& eventData)
+	{
+		CreateNode(LOCAL);
+	}
+
+	void EPScene3D::MiniToolBarCreateReplNode(StringHash eventType, VariantMap& eventData)
+	{
+		CreateNode(REPLICATED);
+	}
+
+	void EPScene3D::MiniToolBarCreateComponent(StringHash eventType, VariantMap& eventData)
+	{
+		Button* b = dynamic_cast<Button*>(GetEventSender());
+		if (b)
+			CreateComponent(b->GetName());
+	}
+
+	void EPScene3D::UpdateToolBar()
+	{
+		/// \todo 
+
+		ToolBarUI* toolBar = editorView_->GetToolBar();
+
+		CheckBox* checkbox = (CheckBox*)toolBar->GetChild("RunUpdatePlay", true);
+		if (checkbox->IsChecked() != runUpdate)
+			checkbox->SetChecked( runUpdate);
+
+		checkbox = (CheckBox*)toolBar->GetChild("RunUpdatePause", true);
+		if (checkbox->IsChecked() != (runUpdate == false))
+			checkbox->SetChecked(runUpdate == false);
+
+		checkbox = (CheckBox*)toolBar->GetChild("RevertOnPause", true);
+		if (checkbox->IsChecked() != revertOnPause)
+			checkbox->SetChecked(revertOnPause);
+
+		checkbox = (CheckBox*)toolBar->GetChild("EditMove", true);
+		if (checkbox->IsChecked() != (editMode == EDIT_MOVE))
+			checkbox->SetChecked(editMode == EDIT_MOVE);
+
+		checkbox = (CheckBox*)toolBar->GetChild("EditRotate", true);
+		if (checkbox->IsChecked() != (editMode == EDIT_ROTATE))
+			checkbox->SetChecked(editMode == EDIT_ROTATE);
+
+		checkbox = (CheckBox*)toolBar->GetChild("EditScale", true);
+		if (checkbox->IsChecked() != (editMode == EDIT_SCALE))
+			checkbox->SetChecked(editMode == EDIT_SCALE);
+
+		checkbox = (CheckBox*)toolBar->GetChild("EditSelect", true);
+		if (checkbox->IsChecked() != (editMode == EDIT_SELECT))
+			checkbox->SetChecked(editMode == EDIT_SELECT);
+
+		checkbox = (CheckBox*)toolBar->GetChild("AxisWorld", true);
+		if (checkbox->IsChecked() != (axisMode == AXIS_WORLD))
+			checkbox->SetChecked(axisMode == AXIS_WORLD);
+
+		checkbox = (CheckBox*)toolBar->GetChild("AxisLocal", true);
+		if (checkbox->IsChecked() != (axisMode == AXIS_LOCAL))
+			checkbox->SetChecked(axisMode == AXIS_LOCAL);
+
+		checkbox = (CheckBox*)toolBar->GetChild("MoveSnap", true);
+		if (checkbox->IsChecked() != moveSnap)
+			checkbox->SetChecked(moveSnap);
+
+		checkbox = (CheckBox*)toolBar->GetChild("RotateSnap", true);
+		if (checkbox->IsChecked() != rotateSnap)
+			checkbox->SetChecked(rotateSnap);
+
+		checkbox = (CheckBox*)toolBar->GetChild("ScaleSnap", true);
+		if (checkbox->IsChecked() != scaleSnap)
+			checkbox->SetChecked(scaleSnap);
+
+		checkbox = (CheckBox*)toolBar->GetChild("SnapScaleHalf", true);
+		if (checkbox->IsChecked() != (snapScaleMode == SNAP_SCALE_HALF))
+			checkbox->SetChecked(snapScaleMode == SNAP_SCALE_HALF);
+
+		checkbox = (CheckBox*)toolBar->GetChild("SnapScaleQuarter", true);
+		if (checkbox->IsChecked() != (snapScaleMode == SNAP_SCALE_QUARTER))
+			checkbox->SetChecked(snapScaleMode == SNAP_SCALE_QUARTER);
+
+		checkbox = (CheckBox*)toolBar->GetChild("PickGeometries", true);
+		if (checkbox->IsChecked() != (pickMode == PICK_GEOMETRIES))
+			checkbox->SetChecked(pickMode == PICK_GEOMETRIES);
+
+		checkbox = (CheckBox*)toolBar->GetChild("PickLights", true);
+		if (checkbox->IsChecked() != (pickMode == PICK_LIGHTS))
+			checkbox->SetChecked(pickMode == PICK_LIGHTS);
+
+		checkbox = (CheckBox*)toolBar->GetChild("PickZones", true);
+		if (checkbox->IsChecked() != (pickMode == PICK_ZONES))
+			checkbox->SetChecked(pickMode == PICK_ZONES);
+
+		checkbox = (CheckBox*)toolBar->GetChild("PickRigidBodies", true);
+		if (checkbox->IsChecked() != (pickMode == PICK_RIGIDBODIES))
+			checkbox->SetChecked(pickMode == PICK_RIGIDBODIES);
+
+		checkbox = (CheckBox*)toolBar->GetChild("PickUIElements", true);
+		if (checkbox->IsChecked() != (pickMode == PICK_UI_ELEMENTS))
+			checkbox->SetChecked(pickMode == PICK_UI_ELEMENTS);
+
+		checkbox = (CheckBox*)toolBar->GetChild("FillPoint", true);
+		if (checkbox->IsChecked() != (fillMode == FILL_POINT))
+			checkbox->SetChecked(fillMode == FILL_POINT);
+
+		checkbox = (CheckBox*)toolBar->GetChild("FillWireFrame", true);
+		if (checkbox->IsChecked() != (fillMode == FILL_WIREFRAME))
+			checkbox->SetChecked(fillMode == FILL_WIREFRAME);
+
+		checkbox = (CheckBox*)toolBar->GetChild("FillSolid", true);
+		if (checkbox->IsChecked() != (fillMode == FILL_SOLID))
+			checkbox->SetChecked(fillMode == FILL_SOLID);
+
+		toolBarDirty = false;
+	}
+
+	void EPScene3D::ToolBarRunUpdatePlay(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			StartSceneUpdate();
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarRunUpdatePause(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			StopSceneUpdate();
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarRevertOnPause(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		revertOnPause = edit->IsChecked();
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarEditModeMove(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			editMode = EDIT_MOVE;
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarEditModeRotate(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			editMode = EDIT_ROTATE;
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarEditModeScale(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			editMode = EDIT_SCALE;
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarEditModeSelect(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			editMode = EDIT_SELECT;
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarAxisModeWorld(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			axisMode = AXIS_WORLD;
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarAxisModeLocal(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			axisMode = AXIS_LOCAL;
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarMoveSnap(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		moveSnap = edit->IsChecked();
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarRotateSnap(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		rotateSnap = edit->IsChecked();
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarScaleSnap(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		scaleSnap = edit->IsChecked();
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarSnapScaleModeHalf(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+		{
+			snapScaleMode = SNAP_SCALE_HALF;
+			snapScale = 0.5;
+		}
+		else if (snapScaleMode == SNAP_SCALE_HALF)
+		{
+			snapScaleMode = SNAP_SCALE_FULL;
+			snapScale = 1.0;
+		}
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarSnapScaleModeQuarter(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+		{
+			snapScaleMode = SNAP_SCALE_QUARTER;
+			snapScale = 0.25;
+		}
+		else if (snapScaleMode == SNAP_SCALE_QUARTER)
+		{
+			snapScaleMode = SNAP_SCALE_FULL;
+			snapScale = 1.0;
+		}
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarPickModeGeometries(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			pickMode = PICK_GEOMETRIES;
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarPickModeLights(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			pickMode = PICK_LIGHTS;
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarPickModeZones(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			pickMode = PICK_ZONES;
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarPickModeRigidBodies(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			pickMode = PICK_RIGIDBODIES;
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarPickModeUIElements(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+			pickMode = PICK_UI_ELEMENTS;
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarFillModePoint(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+		{
+			fillMode = FILL_POINT;
+			SetFillMode(fillMode);
+		}
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarFillModeWireFrame(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+		{
+			fillMode = FILL_WIREFRAME;
+			SetFillMode(fillMode);
+		}
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::ToolBarFillModeSolid(StringHash eventType, VariantMap& eventData)
+	{
+		using namespace Toggled;
+		CheckBox* edit = (CheckBox*)eventData[P_ELEMENT].GetPtr();
+		if (edit && edit->IsChecked())
+		{
+			fillMode = FILL_SOLID;
+			SetFillMode(fillMode);
+		}
+		toolBarDirty = true;
+	}
+
+	void EPScene3D::MakeBackup(const String& fileName)
+	{
+		fileSystem_->Rename(fileName, fileName + ".old");
+	}
+
+	void EPScene3D::RemoveBackup(bool success, const String& fileName)
+	{
+		if (success)
+			fileSystem_->Delete(fileName + ".old");
 	}
 
 	void EPScene3D::HideGrid()
@@ -739,16 +1888,59 @@ namespace Urho3D
 		}
 	}
 
+	void EPScene3D::StartSceneUpdate()
+	{
+		runUpdate = true;
+		// Run audio playback only when scene is updating, so that audio components' time-dependent attributes stay constant when
+		// paused (similar to physics)
+		//audio.Play();
+		toolBarDirty = true;
+
+		// Save scene data for reverting if enabled
+		if (revertOnPause)
+		{
+			revertData = new XMLFile(context_);
+			XMLElement root = revertData->CreateRoot("scene");
+			editorData_->GetEditorScene()->SaveXML(root);
+		}
+		else
+			revertData = NULL;
+	}
+
+	void EPScene3D::StopSceneUpdate()
+	{
+		runUpdate = false;
+		//audio.Stop();
+		toolBarDirty = true;
+
+		// If scene should revert on update stop, load saved data now
+		if (revertOnPause && revertData.NotNull())
+		{
+			editor_->GetHierarchyWindow()->SetSuppressSceneChanges(true);
+		
+			editorData_->GetEditorScene()->Clear();
+			editorData_->GetEditorScene()->LoadXML(revertData->GetRoot());
+			CreateGrid();
+			editor_->GetHierarchyWindow()->UpdateHierarchyItem(editorData_->GetEditorScene(), true);
+			//ClearEditActions();
+			editor_->GetHierarchyWindow()->SetSuppressSceneChanges(false);
+		}
+
+		revertData = NULL;
+	}
+
 	void EPScene3D::CreateGrid()
 	{
 		ResourceCache* cache = GetSubsystem<ResourceCache>();
-		gridNode_ = new Node(context_);
-		grid_ = gridNode_->CreateComponent<CustomGeometry>();
-		grid_->SetNumGeometries(1);
-		grid_->SetMaterial(cache->GetResource<Material>("Materials/VColUnlit.xml"));
-		grid_->SetViewMask(0x80000000); // Editor raycasts use viewmask 0x7fffffff
-		grid_->SetOccludee(false);
-
+		if (!gridNode_)
+		{
+			gridNode_ = new Node(context_);
+			grid_ = gridNode_->CreateComponent<CustomGeometry>();
+			grid_->SetNumGeometries(1);
+			grid_->SetMaterial(cache->GetResource<Material>("Materials/VColUnlit.xml"));
+			grid_->SetViewMask(0x80000000); // Editor raycasts use viewmask 0x7fffffff
+			grid_->SetOccludee(false);
+		}
 		UpdateGrid();
 	}
 
@@ -838,7 +2030,7 @@ namespace Urho3D
 
 	void EPScene3DView::RegisterObject(Context* context)
 	{
-		context->RegisterFactory<EPScene3DView>("EditorPluginView");
+		context->RegisterFactory<EPScene3DView>();
 	}
 
 	void EPScene3DView::OnResize()
@@ -1090,8 +2282,6 @@ namespace Urho3D
 
 		statusBar->SetFixedSize(GetWidth(), 22);
 	}
-
-
 
 	void EPScene3DView::HandleSettingsLineEditTextChange(StringHash eventType, VariantMap& eventData)
 	{

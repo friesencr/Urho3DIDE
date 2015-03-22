@@ -80,6 +80,14 @@ namespace Urho3D
 		return button;
 	}
 
+	UIElement* MiniToolBarUI::CreateSmallToolBarSpacer(unsigned int width)
+	{
+		UIElement* spacer = CreateChild<UIElement>("Spacer");
+		spacer->SetFixedHeight(width);
+
+		return spacer;
+	}
+
 	void MiniToolBarUI::CreateSmallToolBarIcon(UIElement* element)
 	{
 		BorderImage* icon = new BorderImage(context_);

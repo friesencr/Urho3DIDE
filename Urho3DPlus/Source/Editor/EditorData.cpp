@@ -1,4 +1,3 @@
-
 #include "../Urho3D.h"
 #include "../Core/Context.h"
 #include "EditorData.h"
@@ -26,25 +25,48 @@
 #include "../Resource/XMLFile.h"
 #include "Editor.h"
 #include "EditorPlugin.h"
-
+#include "../IO/FileSystem.h"
 
 namespace Urho3D
 {
-
-
-	EditorData::EditorData(Context* context) : Object(context)
+	EditorData::EditorData(Context* context, Editor* editor) : Object(context),
+		editor_(editor)
 	{
-	
+		FileSystem* fileSystem = GetSubsystem<FileSystem>();
+
+		uiSceneFilters.Push("*.xml");
+		uiSceneFilters.Push("*.bin");
+		uiSceneFilters.Push("*.*");
+		uiElementFilters.Push("*.xml");
+		uiAllFilters.Push("*.*");
+		uiScriptFilters.Push("*.*");
+		uiScriptFilters.Push("*.as");
+		uiScriptFilters.Push("*.lua");
+		uiParticleFilters.Push("*.xml");
+		uiRenderPathFilters.Push("*.xml");
+		uiSceneFilter = 0;
+		uiElementFilter = 0;
+		uiNodeFilter = 0;
+		uiImportFilter = 0;
+		uiScriptFilter = 0;
+		uiParticleFilter = 0;
+		uiRenderPathFilter = 0;
+		uiScenePath = fileSystem->GetProgramDir() + "Data/Scenes";
+		uiElementPath = fileSystem->GetProgramDir() + "Data/UI";
+		uiNodePath = fileSystem->GetProgramDir() + "Data/Objects";
+		uiScriptPath = fileSystem->GetProgramDir() + "Data/Scripts";
+		uiParticlePath = fileSystem->GetProgramDir() + "Data/Particles";
+		uiRenderPathPath = fileSystem->GetProgramDir() + "CoreData/RenderPaths";
+		screenshotDir = fileSystem->GetProgramDir() + "Screenshots";
 	}
 
 	EditorData::~EditorData()
 	{
-
 	}
 
 	void EditorData::RegisterObject(Context* context)
 	{
-		context->RegisterFactory<EditorData>("Editor");
+		context->RegisterFactory<EditorData>();
 	}
 
 	void EditorData::Load()
@@ -60,7 +82,6 @@ namespace Urho3D
 		rootUI_->SetTraversalMode(TM_DEPTH_FIRST);     // This is needed for root-like element to prevent artifacts
 		rootUI_->SetDefaultStyle(defaultStyle_);
 		rootUI_->SetLayout(LM_VERTICAL);
-	
 	}
 
 	void EditorData::SetGlobalVarNames(const String& name)
@@ -87,7 +108,6 @@ namespace Urho3D
 	{
 		for (unsigned i = 0; i < editorPlugins_.Size(); i++)
 		{
-
 			if (editorPlugins_[i]->HasMainScreen() && editorPlugins_[i]->Handles(object))
 				return editorPlugins_[i];
 		}
@@ -97,9 +117,8 @@ namespace Urho3D
 
 	EditorPlugin* EditorData::GetEditor(const String& name)
 	{
-		for (unsigned i = 0; i < editorPlugins_.Size(); i++) 
+		for (unsigned i = 0; i < editorPlugins_.Size(); i++)
 		{
-
 			if (editorPlugins_[i]->GetName() == name)
 				return editorPlugins_[i];
 		}
@@ -107,11 +126,15 @@ namespace Urho3D
 		return NULL;
 	}
 
+	Editor* EditorData::GetEditor()
+	{
+		return editor_;
+	}
+
 	EditorPlugin* EditorData::GetSubeditor(Object *object)
 	{
 		for (unsigned i = 0; i < editorPlugins_.Size(); i++)
 		{
-
 			if (!editorPlugins_[i]->HasMainScreen() && editorPlugins_[i]->Handles(object))
 				return editorPlugins_[i];
 		}
@@ -130,5 +153,4 @@ namespace Urho3D
 		//p_plugin->undo_redo = NULL;
 		editorPlugins_.Remove(SharedPtr<EditorPlugin>(plugin));
 	}
-
 }

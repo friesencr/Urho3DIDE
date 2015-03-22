@@ -34,6 +34,7 @@ namespace Urho3D
 
 		void SetIconStyle(XMLFile* iconStyle) { iconStyle_ = iconStyle; }
 		UIElement* CreateSmallToolBarButton(const String& title, const String& toolTipTitle = String::EMPTY);
+		UIElement* CreateSmallToolBarSpacer(unsigned int width);
 	protected:
 		void CreateSmallToolBarIcon( UIElement* element);
 		UIElement* CreateToolTip(UIElement* parent, const String& title, const IntVector2& offset);

@@ -80,7 +80,7 @@ namespace Urho3D
 		return group;
 	}
 
-	UIElement* ToolBarUI::CreateToolBarToggle(const String& groupname, const String& title)
+	CheckBox* ToolBarUI::CreateToolBarToggle(const String& groupname, const String& title)
 	{
 		UIElement* group = GetChild(groupname);
 		if (group)
@@ -102,7 +102,7 @@ namespace Urho3D
 		return NULL;
 	}
 
-	UIElement* ToolBarUI::CreateToolBarToggle(const String& title)
+	CheckBox* ToolBarUI::CreateToolBarToggle(const String& title)
 	{
 		CheckBox* toggle = new CheckBox(context_);
 		toggle->SetName(title);

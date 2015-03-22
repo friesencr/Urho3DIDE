@@ -19,6 +19,7 @@ namespace Urho3D
 	EVENT(E_MENUBAR_ACTION, MenuBarAction)
 	{
 		PARAM(P_ACTION, Action);              // stringhash 
+		PARAM(P_UINAME, UIName);              // string
 	}
 
 	class BorderImage;
@@ -39,7 +40,8 @@ namespace Urho3D
 
 		Menu* CreateMenu(const String& title);
 		Menu* CreateMenuItem(const String& menuTitle, const String& title,const StringHash& action = StringHash::ZERO, int accelKey = 0, int accelQual = 0, bool addToQuickMenu = true, String quickMenuText = "");
-	
+		Window* CreatePopupMenu(Menu* menu);
+		Menu* CreatePopupMenuItem(Window* window, const String& title, const StringHash& action = StringHash::ZERO, int accelKey = 0, int accelQual = 0, bool addToQuickMenu = true, String quickMenuText = "");
 	protected:
 		void FinalizedPopupMenu(Window* popup);
 		Text* CreateAccelKeyText(int accelKey, int accelQual);

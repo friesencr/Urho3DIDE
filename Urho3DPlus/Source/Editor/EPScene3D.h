@@ -5,6 +5,7 @@
 #include "..\Math\Color.h"
 #include "UIGlobals.h"
 #include "..\UI\UIElement.h"
+#include "..\Scene\Node.h"
 
 namespace Urho3D
 {
@@ -58,8 +59,15 @@ namespace Urho3D
 	class LineEdit;
 	class CheckBox;
 	class XMLFile;
+	class Menu;
+	class FileSelector;
+	class FileSystem;
+	class File;
+	class Editor;
+	class Button;
 
 	class EPScene3D;
+	class GizmoScene3D;
 
 	class EPScene3DView : public BorderImage
 	{
@@ -146,9 +154,9 @@ namespace Urho3D
 		SharedPtr<Camera>	camera_;
 		/// SoundListener
 		SharedPtr<SoundListener> soundListener_;
-		/// 
+		///
 		float cameraYaw_;
-		/// 
+		///
 		float cameraPitch_;
 		/// Own scene.
 		bool ownScene_;
@@ -175,6 +183,7 @@ namespace Urho3D
 	class EPScene3D : public EditorPlugin
 	{
 		OBJECT(EPScene3D);
+		friend class GizmoScene3D;
 	public:
 		/// Construct.
 		EPScene3D(Context* context);
@@ -183,37 +192,45 @@ namespace Urho3D
 		/// Register object factory.
 		static void RegisterObject(Context* context);
 
-
-		virtual bool HasMainScreen() override;
-		virtual String GetName() const override;
-		virtual void Edit(Object *object) override;
-		virtual bool Handles(Object *object) const override;
+		virtual bool	HasMainScreen() override;
+		virtual String	GetName() const override;
+		virtual void	Edit(Object *object) override;
+		virtual bool	Handles(Object *object) const override;
 		/// calls Start, because EPScene3D is a main Editor plugin
 		///	GetMainScreen will be called in AddEditorPlugin() once, so use it as Start().
-		virtual UIElement* GetMainScreen() override;
-		virtual void SetVisible(bool visible) override;
-		virtual void Update(float timeStep) override;
-		// debug handling
-		void ToggleRenderingDebug()	{renderingDebug = !renderingDebug;	}
-		void TogglePhysicsDebug(){physicsDebug = !physicsDebug;	}
-		void ToggleOctreeDebug(){	octreeDebug = !octreeDebug;	}
+		virtual UIElement*	GetMainScreen() override;
+		virtual void		SetVisible(bool visible) override;
+		virtual void		Update(float timeStep) override;
 
+		// debug handling
+		void ToggleRenderingDebug()	{ renderingDebug = !renderingDebug; }
+		void TogglePhysicsDebug(){ physicsDebug = !physicsDebug; }
+		void ToggleOctreeDebug(){ octreeDebug = !octreeDebug; }
 		// camera handling
 		void ResetCamera();
 		void ReacquireCameraYawPitch();
 		void UpdateViewParameters();
-		// grid 
+		// grid
 		void HideGrid();
 		void ShowGrid();
+		// scene update handling
+		void StartSceneUpdate();
+		void StopSceneUpdate();
 	protected:
 		void Start();
+		void CreateMiniToolBarUI();
+		void CreateToolBarUI();
 
 		void CreateStatsBar();
 		void SetupStatsBarText(Text* text, Font* font, int x, int y, HorizontalAlignment hAlign, VerticalAlignment vAlign);
 		void UpdateStats(float timeStep);
+		void SetFillMode(FillMode fM_);
 
 		Vector3 SelectedNodesCenterPoint();
 		void	DrawNodeDebug(Node* node, DebugRenderer* debug, bool drawNode = true);
+		void	MakeBackup(const String& fileName);
+		void	RemoveBackup(bool success, const String& fileName);
+
 		/// edit nodes
 		bool MoveNodes(Vector3 adjust);
 		bool RotateNodes(Vector3 adjust);
@@ -236,8 +253,61 @@ namespace Urho3D
 		void HandleEndViewUpdate(StringHash eventType, VariantMap& eventData);
 		void HandleBeginViewRender(StringHash eventType, VariantMap& eventData);
 		void HandleEndViewRender(StringHash eventType, VariantMap& eventData);
-		/// Resize the view 
+		/// Resize the view
 		void HandleResizeView(StringHash eventType, VariantMap& eventData);
+		/// Handle Menu Bar Events
+		void HandleMenuBarAction(StringHash eventType, VariantMap& eventData);
+		/// messageBox
+		void HandleMessageAcknowledgement(StringHash eventType, VariantMap& eventData);
+
+		// Menu Bar actions
+		/// create new scene, because we use only one scene reset it ...
+		bool ResetScene();
+		void HandleOpenSceneFile(StringHash eventType, VariantMap& eventData);
+		void HandleSaveSceneFile(StringHash eventType, VariantMap& eventData);
+		void HandleLoadNodeFile(StringHash eventType, VariantMap& eventData);
+		void HandleSaveNodeFile(StringHash eventType, VariantMap& eventData);
+
+		bool LoadScene(const String& fileName);
+		bool SaveScene(const String& fileName);
+		Node* LoadNode(const String& fileName, Node* parent = NULL);
+		bool SaveNode(const String& fileName);
+		Node* InstantiateNodeFromFile(File* file, const Vector3& position, const Quaternion& rotation, float scaleMod = 1.0f, Node* parent = NULL, CreateMode mode = REPLICATED);
+
+		Node* CreateNode(CreateMode mode);
+		void CreateComponent(const String& componentType);
+		void CreateBuiltinObject(const String& name);
+		bool CheckForExistingGlobalComponent(Node* node, const String& typeName);
+
+		// Mini Tool Bar actions
+		void MiniToolBarCreateLocalNode(StringHash eventType, VariantMap& eventData);
+		void MiniToolBarCreateReplNode(StringHash eventType, VariantMap& eventData);
+		void MiniToolBarCreateComponent(StringHash eventType, VariantMap& eventData);
+
+		// Mini Tool Bar actions
+		void UpdateToolBar();
+		void ToolBarRunUpdatePlay(StringHash eventType, VariantMap& eventData);
+		void ToolBarRunUpdatePause(StringHash eventType, VariantMap& eventData);
+		void ToolBarRevertOnPause(StringHash eventType, VariantMap& eventData);
+		void ToolBarEditModeMove(StringHash eventType, VariantMap& eventData);
+		void ToolBarEditModeRotate(StringHash eventType, VariantMap& eventData);
+		void ToolBarEditModeScale(StringHash eventType, VariantMap& eventData);
+		void ToolBarEditModeSelect(StringHash eventType, VariantMap& eventData);
+		void ToolBarAxisModeWorld(StringHash eventType, VariantMap& eventData);
+		void ToolBarAxisModeLocal(StringHash eventType, VariantMap& eventData);
+		void ToolBarMoveSnap(StringHash eventType, VariantMap& eventData);
+		void ToolBarRotateSnap(StringHash eventType, VariantMap& eventData);
+		void ToolBarScaleSnap(StringHash eventType, VariantMap& eventData);
+		void ToolBarSnapScaleModeHalf(StringHash eventType, VariantMap& eventData);
+		void ToolBarSnapScaleModeQuarter(StringHash eventType, VariantMap& eventData);
+		void ToolBarPickModeGeometries(StringHash eventType, VariantMap& eventData);
+		void ToolBarPickModeLights(StringHash eventType, VariantMap& eventData);
+		void ToolBarPickModeZones(StringHash eventType, VariantMap& eventData);
+		void ToolBarPickModeRigidBodies(StringHash eventType, VariantMap& eventData);
+		void ToolBarPickModeUIElements(StringHash eventType, VariantMap& eventData);
+		void ToolBarFillModePoint(StringHash eventType, VariantMap& eventData);
+		void ToolBarFillModeWireFrame(StringHash eventType, VariantMap& eventData);
+		void ToolBarFillModeSolid(StringHash eventType, VariantMap& eventData);
 
 		SharedPtr<UIElement>		window_;
 		SharedPtr<EPScene3DView>	activeView;
@@ -245,23 +315,26 @@ namespace Urho3D
 		SharedPtr<Camera>			camera_;
 
 		/// cache editor subsystems
-		EditorData*	editorData_;
-		EditorView*	editorView_;
-		EditorSelection* editorSelection_;
-
+		EditorData*			editorData_;
+		EditorView*			editorView_;
+		EditorSelection*	editorSelection_;
+		Editor*				editor_;
 		/// cache subsystems
-		UI* ui_;
-		Input* input_;
-		Renderer* renderer;
-		ResourceCache* cache_;
+		UI*				ui_;
+		Input*			input_;
+		Renderer*		renderer;
+		ResourceCache*	cache_;
+		FileSystem*		fileSystem_;
 
-		///  properties \todo make an input edit state system or ... 
-		// mouse handling
+		///  properties \todo make an input edit state system or ...
+		/// mouse handling
 		bool	toggledMouseLock_;
 		int		mouseOrbitMode;
-		// scene update handling
-		bool	runUpdate  = true;
-		//camera handling
+		/// scene update handling
+		bool	runUpdate = false;
+		bool    revertOnPause = true;
+		SharedPtr<XMLFile> revertData;
+		///camera handling
 		float	cameraBaseSpeed = 10.0f;
 		float	cameraBaseRotationSpeed = 0.2f;
 		float	cameraShiftSpeedMultiplier = 5.0f;
@@ -271,9 +344,9 @@ namespace Urho3D
 		float	viewNearClip = 0.1f;
 		float	viewFarClip = 1000.0f;
 		float	viewFov = 45.0f;
-		// create node
+		/// create node
 		float	newNodeDistance = 20.0f;
-		// edit input states 
+		/// edit input states
 		float	moveStep = 0.5f;
 		float	rotateStep = 5.0f;
 		float	scaleStep = 0.1f;
@@ -281,21 +354,34 @@ namespace Urho3D
 		bool	moveSnap = false;
 		bool	rotateSnap = false;
 		bool	scaleSnap = false;
-		// debug handling
+		/// debug handling
 		bool	renderingDebug = false;
 		bool	physicsDebug = false;
 		bool	octreeDebug = false;
-		// mouse pick handling
+		/// mouse pick handling
 		int		pickMode = PICK_GEOMETRIES;
-
+		/// modes
 		EditMode editMode = EDIT_MOVE;
 		AxisMode axisMode = AXIS_WORLD;
 		FillMode fillMode = FILL_SOLID;
 		SnapScaleMode snapScaleMode = SNAP_SCALE_FULL;
-
-		// ui stuff
+		/// scene handling
+		bool sceneModified;
+		String instantiateFileName;
+		CreateMode instantiateMode;
+		/// ui stuff
 		SharedPtr<Text> editorModeText;
 		SharedPtr<Text> renderStatsText;
+		SharedPtr<Menu>	sceneMenu_;
+		SharedPtr<Menu>	createMenu_;
+		/// cached mini tool bar buttons, to set visibility
+		Vector<Button*> miniToolBarButtons_;
+		/// cached tool bar toggles, to set visibility
+		Vector<UIElement*> toolBarToggles;
+		bool toolBarDirty = true;
+
+		/// gizmo
+		SharedPtr<GizmoScene3D> gizmo_;
 
 		//////////////////////////////////////////////////////////////////////////
 		/// Grid handling \todo put it into a component or object ...
@@ -303,10 +389,10 @@ namespace Urho3D
 		void CreateGrid();
 		void UpdateGrid(bool updateGridGeometry = true);
 
-		SharedPtr<Node>			gridNode_;
-		SharedPtr<CustomGeometry> grid_;
-		bool showGrid_;
-		bool grid2DMode_;
+		SharedPtr<Node>				gridNode_;
+		SharedPtr<CustomGeometry>	grid_;
+		bool	showGrid_;
+		bool	grid2DMode_;
 		Color gridColor;
 		Color gridSubdivisionColor;
 		Color gridXColor;

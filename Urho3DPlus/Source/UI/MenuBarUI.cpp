@@ -129,10 +129,72 @@ namespace Urho3D
 		}
 
 		popup->AddChild(menuItem);
-		SubscribeToEvent(menuItem, E_MENUSELECTED, HANDLER(MenuBarUI, HandleMenuSelected));
+		if (action != StringHash::ZERO)
+			SubscribeToEvent(menuItem, E_MENUSELECTED, HANDLER(MenuBarUI, HandleMenuSelected));
 		/// \todo use dirty masks
 		FinalizedPopupMenu(popup);
 
+		return menuItem;
+	}
+
+	Window* MenuBarUI::CreatePopupMenu(Menu* menu)
+	{
+		if (!menu)
+		{
+			return NULL;
+		}
+		// create popup
+		Window* popup = new  Window(context_);
+	
+		popup->SetLayout(LM_VERTICAL, 1, IntRect(2, 6, 2, 6));
+		popup->SetDefaultStyle(GetDefaultStyle());
+		popup->SetStyleAuto();
+		menu->SetPopup(popup);
+		menu->SetPopupOffset(IntVector2(0, menu->GetHeight()));
+		return popup;
+	}
+
+	Menu* MenuBarUI::CreatePopupMenuItem(Window* window, const String& title, const StringHash& action /*= StringHash::ZERO*/, int accelKey /*= 0*/, int accelQual /*= 0*/, bool addToQuickMenu /*= true*/, String quickMenuText /*= ""*/)
+	{
+		if (!window)
+		{
+			return NULL;
+		}
+
+		// create Menu item
+		Menu* menuItem = new Menu(context_);
+		menuItem->SetName(title);
+		menuItem->SetStyleAuto(GetDefaultStyle());
+		menuItem->SetLayout(LM_HORIZONTAL, 0, IntRect(8, 2, 8, 2));
+		if (action != StringHash::ZERO)
+		{
+			menuItem->SetVar(ACTION_VAR, action);
+		}
+		if (accelKey > 0)
+			menuItem->SetAccelerator(accelKey, accelQual);
+
+		// Create Text Label
+		Text* menuText = new Text(context_);
+		menuText->SetName(title + "_text");
+		menuItem->AddChild(menuText);
+		menuText->SetStyle("EditorMenuText");
+		menuText->SetText(title);
+
+		if (accelKey != 0)
+		{
+			UIElement* spacer = new UIElement(context_);
+			spacer->SetMinWidth(menuText->GetIndentSpacing());
+			spacer->SetHeight(menuText->GetHeight());
+
+			menuItem->AddChild(spacer);
+			menuItem->AddChild(CreateAccelKeyText(accelKey, accelQual));
+		}
+
+		window->AddChild(menuItem);
+		if (action != StringHash::ZERO)
+			SubscribeToEvent(menuItem, E_MENUSELECTED, HANDLER(MenuBarUI, HandleMenuSelected));
+		/// \todo use dirty masks
+		FinalizedPopupMenu(window);
 		return menuItem;
 	}
 
@@ -239,6 +301,7 @@ namespace Urho3D
 
 				VariantMap& newEventData = GetEventDataMap();
 				newEventData[P_ACTION] = action;
+				newEventData[P_UINAME] = element->GetName();
 				SendEvent(E_MENUBAR_ACTION, newEventData);
 			}
 

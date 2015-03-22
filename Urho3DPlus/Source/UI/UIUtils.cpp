@@ -671,6 +671,23 @@ namespace Urho3D
 			return parent;
 		}
 
+		Urho3D::String ExtractFileName(VariantMap& eventData, bool forSave /*= false*/)
+		{
+			using namespace FileSelected;
+			String fileName;
+
+			// Check for OK
+			if (eventData[P_OK].GetBool())
+			{
+				String filter = eventData[P_FILTER].GetString();
+				fileName = eventData[P_FILENAME].GetString();
+				// Add default extension for saving if not specified
+				if (GetExtension(fileName).Empty() && forSave && filter != "*.*")
+					fileName = fileName + filter.Substring(1);
+			}
+			return fileName;
+		}
+
 		void SetAttributeEditorID(UIElement* attrEdit, Vector<Serializable*>& serializables)
 		{
 			if (serializables.Size() == 0)

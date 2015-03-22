@@ -54,7 +54,7 @@ namespace Urho3D
 
 	void EditorSelection::RegisterObject(Context* context)
 	{
-		context->RegisterFactory<EditorSelection>("Editor");
+		context->RegisterFactory<EditorSelection>();
 	}
 
 	void EditorSelection::ClearSelection()

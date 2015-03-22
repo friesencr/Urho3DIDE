@@ -21,7 +21,7 @@ namespace Urho3D
 
 	void IDESettings::RegisterObject(Context* context)
 	{
-		context->RegisterFactory<IDESettings>("IDE");
+		context->RegisterFactory<IDESettings>();
 
 		ATTRIBUTE("WindowTitle", String, windowTitle_, String("Urho3D IDE"), AM_FILE);
 		ATTRIBUTE("WindowIcon", String, windowIcon_, String("Textures/UrhoIcon.png"), AM_FILE);

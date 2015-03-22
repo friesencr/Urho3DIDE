@@ -28,7 +28,7 @@ namespace Urho3D
 
 	void EPScene2D::RegisterObject(Context* context)
 	{
-		context->RegisterFactory<EPScene2D>("EditorPlugin");
+		context->RegisterFactory<EPScene2D>();
 	}
 
 	bool EPScene2D::HasMainScreen()

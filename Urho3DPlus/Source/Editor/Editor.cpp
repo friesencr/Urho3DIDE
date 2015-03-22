@@ -107,7 +107,7 @@ namespace Urho3D
 			GetSubsystem<ResourcePickerManager>()->Init();
 		}
 
-		context_->RegisterSubsystem(new EditorData(context_));
+		context_->RegisterSubsystem(new EditorData(context_,this));
 		editorData_ = GetSubsystem<EditorData>();
 		editorData_->Load();
 
