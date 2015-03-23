@@ -238,6 +238,8 @@ namespace Urho3D
 
 		/// Picking
 		void ViewRaycast(bool mouseClick);
+		void SelectComponent(Component* component, bool multiselect);
+		void SelectNode(Node* node, bool multiselect);
 
 		/// mouse handling
 		void SetMouseMode(bool enable);

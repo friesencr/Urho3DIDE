@@ -137,6 +137,8 @@ namespace Urho3D
 		// Modify engine startup parameters
 		engineParameters_["LogName"] = GetTypeName() + ".log";//GetSubsystem<FileSystem>()->GetAppPreferencesDir("urho3d", "logs")
 		//	engineParameters_["AutoloadPaths"] = "Data;CoreData;IDEData";
+		//engineParameters_["WindowResizable"] = true;
+		
 	}
 
 	void IDE::Start()

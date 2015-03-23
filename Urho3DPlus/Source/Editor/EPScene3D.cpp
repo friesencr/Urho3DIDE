@@ -64,6 +64,9 @@
 #include "ToolBarUI.h"
 #include "../UI/CheckBox.h"
 #include "GizmoScene3D.h"
+#include "../Physics/RigidBody.h"
+#include "../UI/ListView.h"
+
 
 namespace Urho3D
 {
@@ -948,6 +951,211 @@ namespace Urho3D
 		// Ignore if mouse is grabbed by other operation
 		if (input_->IsMouseGrabbed())
 			return;
+		Scene* editorScene = editorData_->GetEditorScene();
+
+		Input* input = GetSubsystem<Input>();
+
+		IntVector2 pos = ui_->GetCursorPosition();
+		UIElement* elementAtPos = ui_->GetElementAt(pos, pickMode != PICK_UI_ELEMENTS);
+		if (editMode == EDIT_SPAWN)
+		{
+// 			if (mouseClick && input_->GetMouseButtonPress(MOUSEB_LEFT) && elementAtPos == NULL)
+// 				SpawnObject();
+			return;
+		}
+
+		// Do not raycast / change selection if hovering over the gizmo
+		if (gizmo_->IsGizmoSelected())
+			return;
+
+		DebugRenderer* debug = editorScene->GetComponent<DebugRenderer>();
+
+		if (pickMode == PICK_UI_ELEMENTS)
+		{
+// 			bool leftClick = mouseClick && input->GetMouseButtonPress(MOUSEB_LEFT);
+// 			bool multiselect = input->GetQualifierDown(QUAL_CTRL);
+// 
+// 			// Only interested in user-created UI elements
+// 			if (elementAtPos != NULL && elementAtPos != editorUIElement && elementAtPos.GetElementEventSender() == editorUIElement)
+// 			{
+// 				ui.DebugDraw(elementAtPos);
+// 
+// 				if (leftClick)
+// 					SelectUIElement(elementAtPos, multiselect);
+// 			}
+// 			// If clicked on emptiness in non-multiselect mode, clear the selection
+// 			else if (leftClick && !multiselect && ui.GetElementAt(pos) is null)
+// 				hierarchyList.ClearSelection();
+
+			return;
+		}
+
+		// Do not raycast / change selection if hovering over a UI element when not in PICK_UI_ELEMENTS Mode
+		if (elementAtPos != activeView)
+			return;
+		const IntVector2& screenpos = activeView->GetScreenPosition();
+		float	posx = float(pos.x_ - screenpos.x_) / float(activeView->GetWidth());
+		float	posy = float(pos.y_ - screenpos.y_) / float(activeView->GetHeight());
+		Ray cameraRay = camera_->GetScreenRay(posx, posy);
+
+		Component* selectedComponent = NULL;
+		if (pickMode < PICK_RIGIDBODIES)
+		{
+			if (editorScene->GetComponent<Octree>() == NULL)
+				return;
+
+			PODVector<RayQueryResult> result_;
+			editorScene->GetComponent<Octree>()->RaycastSingle(RayOctreeQuery(result_,cameraRay, RAY_TRIANGLE, camera_->GetFarClip(),
+				pickModeDrawableFlags[pickMode], 0x7fffffff));
+
+			if (result_.Size() != 0 && result_[0].drawable_ != NULL)
+			{
+				Drawable* drawable = result_[0].drawable_;
+				// If selecting a terrain patch, select the parent terrain instead
+				if (drawable->GetTypeName() != "TerrainPatch")
+				{
+					selectedComponent = drawable;
+					if (debug != NULL)
+					{
+						debug->AddNode(drawable->GetNode(), 1.0, false);
+						drawable->DrawDebugGeometry(debug, false);
+					}
+				}
+				else if (drawable->GetNode()->GetParent() != NULL)
+					selectedComponent = drawable->GetNode()->GetParent()->GetComponent<Terrain>();
+			}
+		}
+		else
+		{
+			if (editorScene->GetComponent<PhysicsWorld>() == NULL)
+				return;
+
+			// If we are not running the actual physics update, refresh collisions before raycasting
+			if (!runUpdate)
+				editorScene->GetComponent<PhysicsWorld>()->UpdateCollisions();
+
+			PhysicsRaycastResult result;
+			editorScene->GetComponent<PhysicsWorld>()->RaycastSingle(result,cameraRay, camera_->GetFarClip());
+
+			if (result.body_ != NULL)
+			{
+				RigidBody* body = result.body_;
+				if (debug != NULL)
+				{
+					debug->AddNode(body->GetNode(), 1.0, false);
+					body->DrawDebugGeometry(debug, false);
+				}
+				selectedComponent = body;
+			}
+		}
+
+		if (mouseClick && input->GetMouseButtonPress(MOUSEB_LEFT))
+		{
+			bool multiselect = input->GetQualifierDown(QUAL_CTRL);
+			if (selectedComponent != NULL)
+			{
+				if (input->GetQualifierDown(QUAL_SHIFT))
+				{
+					// If we are selecting components, but have nodes in existing selection, do not multiselect to prevent confusion
+					if (!editorSelection_->GetSelectedNodes().Empty())
+						multiselect = false;
+					SelectComponent(selectedComponent, multiselect);
+				}
+				else
+				{
+					// If we are selecting nodes, but have components in existing selection, do not multiselect to prevent confusion
+					if (!editorSelection_->GetSelectedComponents().Empty())
+						multiselect = false;
+					SelectNode(selectedComponent->GetNode(), multiselect);
+				}
+			}
+			else
+			{
+				// If clicked on emptiness in non-multiselect mode, clear the selection
+				if (!multiselect)
+					SelectComponent(NULL, false);
+			}
+		}
+
+	}
+
+	void EPScene3D::SelectComponent(Component* component, bool multiselect)
+	{
+		if (component == NULL && !multiselect)
+		{
+			editor_->GetHierarchyWindow()->GetHierarchyList()->ClearSelection();
+			return;
+		}
+
+		Node* node = component->GetNode();
+		if (node == NULL && !multiselect)
+		{
+			editor_->GetHierarchyWindow()->GetHierarchyList()->ClearSelection();
+			return;
+		}
+		ListView* hierarchyList = editor_->GetHierarchyWindow()->GetHierarchyList();
+
+		unsigned int nodeIndex = editor_->GetHierarchyWindow()->GetListIndex(node);
+		unsigned int componentIndex = editor_->GetHierarchyWindow()->GetComponentListIndex(component);
+		unsigned int numItems = hierarchyList->GetNumItems();
+
+		if (nodeIndex < numItems && componentIndex < numItems)
+		{
+			// Expand the node chain now
+			if (!multiselect || !hierarchyList->IsSelected(componentIndex))
+			{
+				// Go in the parent chain up to make sure the chain is expanded
+				Node* current = node;
+				do
+				{
+					hierarchyList->Expand(editor_->GetHierarchyWindow()->GetListIndex(current), true);
+					current = current->GetParent();
+				} while (current != NULL);
+			}
+
+			// This causes an event to be sent, in response we set the node/component selections, and refresh editors
+			if (!multiselect)
+				hierarchyList->SetSelection( componentIndex);
+			else
+				hierarchyList->ToggleSelection(componentIndex);
+		}
+		else if (!multiselect)
+			hierarchyList->ClearSelection();
+	}
+
+	void EPScene3D::SelectNode(Node* node, bool multiselect)
+	{
+		if (node == NULL && !multiselect)
+		{
+			editor_->GetHierarchyWindow()->GetHierarchyList()->ClearSelection();
+			return;
+		}
+		ListView* hierarchyList = editor_->GetHierarchyWindow()->GetHierarchyList();
+		unsigned int index = editor_->GetHierarchyWindow()->GetListIndex(node);
+		unsigned int numItems = hierarchyList->GetNumItems();
+
+		if (index < numItems)
+		{
+			// Expand the node chain now
+			if (!multiselect || !hierarchyList->IsSelected(index))
+			{
+				// Go in the parent chain up to make sure the chain is expanded
+				Node* current = node;
+				do
+				{
+					hierarchyList->Expand(editor_->GetHierarchyWindow()->GetListIndex(current), true);
+					current = current->GetParent();
+				} while (current != NULL);
+			}
+
+			// This causes an event to be sent, in response we set the node/component selections, and refresh editors
+			if (!multiselect)
+				hierarchyList->SetSelection( index);
+			else
+				hierarchyList->ToggleSelection(index);
+		}
+		else if (!multiselect)
+			hierarchyList->ClearSelection();
 	}
 
 	void EPScene3D::SetMouseMode(bool enable)
@@ -1016,6 +1224,8 @@ namespace Urho3D
 		Octree* octree = scene->GetComponent<Octree>();
 		if (octreeDebug && octree != NULL)
 			octree->DrawDebugGeometry(true);
+
+		ViewRaycast(false);
 	}
 
 	void EPScene3D::ViewMouseClick(StringHash eventType, VariantMap& eventData)
