@@ -36,6 +36,7 @@ namespace Urho3D
 	const StringHash A_QUITEDITOR_VAR("QuitEditorAction");
 	const StringHash A_SHOWATTRIBUTE_VAR("ShowAttributeAction");
 	const StringHash A_SHOWHIERARCHY_VAR("ShowHierarchyAction");
+	const StringHash A_SHOWRESOURCE_VAR("ShowResourceBrowser");
 
 	const StringHash A_NEWSCENE_VAR("NewScene");
 	const StringHash A_OPENSCENE_VAR("OpenScene");

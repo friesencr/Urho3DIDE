@@ -53,6 +53,7 @@
 #include "../IO/FileSystem.h"
 #include "ProjectManager.h"
 #include "../IO/Log.h"
+#include "ResourceBrowser.h"
 
 namespace Urho3D
 {
@@ -60,8 +61,6 @@ namespace Urho3D
 	{
 		context->RegisterFactory<Editor>();
 		EPScene3DView::RegisterObject(context);
-		EPScene3D::RegisterObject(context);
-		EPScene2D::RegisterObject(context);
 
 		EditorData::RegisterObject(context);
 		EditorView::RegisterObject(context);
@@ -169,9 +168,16 @@ namespace Urho3D
 		/// add Attribute inspector to the right side of the editor.
 		editorView_->GetRightFrame()->AddTab("Inspector", atrele);
 
-		SubscribeToEvent(editorView_->GetMiddleFrame(), E_ACTIVETABCHANGED, HANDLER(Editor, HandleMainEditorTabChanged));
 
+		//////////////////////////////////////////////////////////////////////////
+		/// create Resource Browser
+
+		resourceBrowser_ = new ResourceBrowser(context_);
+		resourceBrowser_->CreateResourceBrowser();
+		resourceBrowser_->ShowResourceBrowserWindow();
+		SubscribeToEvent(editorView_->GetMiddleFrame(), E_ACTIVETABCHANGED, HANDLER(Editor, HandleMainEditorTabChanged));
 		SubscribeToEvent(E_UPDATE, HANDLER(Editor, HandleUpdate));
+
 		visible_ = true;
 		return true;
 	}
@@ -428,6 +434,9 @@ namespace Urho3D
 		{
 			editorPluginOver_->Update(timestep);
 		}
+		if (resourceBrowser_->IsVisible())
+			resourceBrowser_->Update();
+		
 	}
 
 	void Editor::HandleMenuBarAction(StringHash eventType, VariantMap& eventData)

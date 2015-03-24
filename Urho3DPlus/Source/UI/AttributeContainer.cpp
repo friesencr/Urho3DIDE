@@ -316,7 +316,7 @@ namespace Urho3D
 			attributeList_->AddItem(attr);
 
 
-			SubscribeToEvent(attr, AEE_RESREFVARCHANGED, HANDLER(AttributeContainer, EditEnumAttribute));
+			SubscribeToEvent(attr, AEE_RESREFVARCHANGED, HANDLER(AttributeContainer, EditResRefAttribute));
 			parent = attr;
 			attributes_[index].Insert(subIndex, attr);
 		}
@@ -515,6 +515,7 @@ namespace Urho3D
 		if (attr && serializable_)
 		{
 			serializable_->SetAttribute(attr->GetIndex(), attr->GetVariant());
+			SetSerializableAttributes(serializable_,true);
 		}
 	}
 

@@ -284,6 +284,7 @@ void CreateMenuBar()
     uiMenuBar.SetFixedWidth(graphics.width);
 
     {
+		
         Menu@ menu = CreateMenu("File");
         Window@ popup = menu.popup;
         popup.AddChild(CreateMenuItem("New scene", @ResetScene, 'N', QUAL_SHIFT | QUAL_CTRL));

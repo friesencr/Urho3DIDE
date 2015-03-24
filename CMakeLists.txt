@@ -56,5 +56,5 @@ include_directories (${URHO3D_INCLUDE_DIRS})
 add_subdirectory (Urho3DPlus)
 add_subdirectory (IDE)
 add_subdirectory (Runtime)
-
+add_subdirectory (RuntimeWithAppState)
 

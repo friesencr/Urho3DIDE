@@ -333,7 +333,7 @@ namespace Urho3D
  		welcomeUI_ = prjMng_->CreateWelcomeScreen();
 		rootUI_->AddChild(welcomeUI_);
 		//welcomeUI_->SetSize(rootUI_->GetSize());
-		editor_->GetEditorView()->SetToolBarVisible(false);
+		//editor_->GetEditorView()->SetToolBarVisible(false);
 		editor_->GetEditorView()->SetLeftFrameVisible(false);
 		editor_->GetEditorView()->SetRightFrameVisible(false);
 		unsigned index = editor_->GetEditorView()->GetMiddleFrame()->AddTab("Welcome", welcomeUI_);
@@ -347,7 +347,7 @@ namespace Urho3D
 		prjMng_->ShowWelcomeScreen(false);
 
 		editor_->GetEditorView()->GetMiddleFrame()->RemoveTab("Welcome");
-		editor_->GetEditorView()->SetToolBarVisible(true);
+	//	editor_->GetEditorView()->SetToolBarVisible(true);
 		editor_->GetEditorView()->SetLeftFrameVisible(true);
 		editor_->GetEditorView()->SetRightFrameVisible(true);
 		editor_->LoadPlugins();

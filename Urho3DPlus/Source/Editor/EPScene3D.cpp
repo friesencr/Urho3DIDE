@@ -135,11 +135,6 @@ namespace Urho3D
 	{
 	}
 
-	void EPScene3D::RegisterObject(Context* context)
-	{
-		context->RegisterFactory<EPScene3D>();
-	}
-
 	bool EPScene3D::HasMainScreen()
 	{
 		return true;
@@ -210,9 +205,11 @@ namespace Urho3D
 				SubscribeToEvent(E_BEGINVIEWRENDER, HANDLER(EPScene3D, HandleBeginViewRender));
 				SubscribeToEvent(E_ENDVIEWRENDER, HANDLER(EPScene3D, HandleEndViewRender));
 				gizmo_->ShowGizmo();
+				activeView->SetAutoUpdate(true);
 			}
 			else
 			{
+
 				UnsubscribeFromEvent(E_POSTRENDERUPDATE);
 				UnsubscribeFromEvent(E_UIMOUSECLICK);
 				UnsubscribeFromEvent(E_MOUSEMOVE);
@@ -222,6 +219,7 @@ namespace Urho3D
 				UnsubscribeFromEvent(E_BEGINVIEWRENDER);
 				UnsubscribeFromEvent(E_ENDVIEWRENDER); 
 				gizmo_->HideGizmo();
+				activeView->SetAutoUpdate(false);
 			}
 		}
 	}

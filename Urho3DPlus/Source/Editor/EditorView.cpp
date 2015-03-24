@@ -161,7 +161,7 @@ namespace Urho3D
 		int minitoolheight = ui_->GetRoot()->GetHeight() - menubar_->GetMinHeight();
 		if (toolbar_->IsVisible())
 			minitoolheight -= toolbar_->GetMinHeight();
-
+		miniToolbar_->SetFixedHeight(minitoolheight);
 		middleFrame_->SetFixedHeight(minitoolheight);
 		if (leftFrame_->IsVisible())
 		{

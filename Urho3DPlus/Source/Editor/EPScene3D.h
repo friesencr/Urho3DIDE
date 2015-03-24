@@ -189,8 +189,7 @@ namespace Urho3D
 		EPScene3D(Context* context);
 		/// Destruct.
 		virtual ~EPScene3D();
-		/// Register object factory.
-		static void RegisterObject(Context* context);
+
 
 		virtual bool	HasMainScreen() override;
 		virtual String	GetName() const override;

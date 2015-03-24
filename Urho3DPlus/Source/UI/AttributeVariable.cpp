@@ -764,6 +764,8 @@ namespace Urho3D
 		varEdit_->SetDragDropMode(DD_TARGET);
 
 		SubscribeToEvent(varEdit_, E_TEXTFINISHED, HANDLER(ResourceRefAttributeUI, HandleTextChange));
+		//SubscribeToEvent(varEdit_, E_TEXTCHANGED, HANDLER(ResourceRefAttributeUI, HandleTextChange));
+		
 	}
 
 	ResourceRefAttributeUI::~ResourceRefAttributeUI()

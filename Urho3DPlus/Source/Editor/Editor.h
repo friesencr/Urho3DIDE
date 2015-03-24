@@ -30,6 +30,7 @@ namespace Urho3D
 	class EditorView;
 	class EditorPlugin;
 	class ProjectSettings;
+	class ResourceBrowser;
 
 	class Editor : public Object
 	{
@@ -126,6 +127,8 @@ namespace Urho3D
 		/// default IDE Editors
 		SharedPtr<HierarchyWindow>		hierarchyWindow_;
 		SharedPtr<AttributeInspector>	attributeWindow_;
+		SharedPtr<ResourceBrowser>		resourceBrowser_;
+
 	private:
 	};
 }

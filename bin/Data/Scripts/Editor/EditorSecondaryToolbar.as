@@ -88,7 +88,7 @@ void CreateSecondaryToolBar()
     secondaryToolBar.AddChild(b);
     SubscribeToEvent(b, "Released", "SmallToolBarCreateComponent");
 
-    b = CreateSmallToolBarButton("Constraint");
+    b = CreateSmallToolBarButton("	");
     secondaryToolBar.AddChild(b);
     SubscribeToEvent(b, "Released", "SmallToolBarCreateComponent"); 
 
