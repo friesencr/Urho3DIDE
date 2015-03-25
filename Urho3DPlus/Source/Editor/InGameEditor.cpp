@@ -217,7 +217,7 @@ namespace Urho3D
 		if (plugin)
 		{
 			SharedPtr<EditorPlugin> editorplugin(plugin);
-			Vector<SharedPtr<EditorPlugin>>::Iterator it = allEditorPlugins_.Find(editorplugin);
+			Vector<SharedPtr<EditorPlugin> >::Iterator it = allEditorPlugins_.Find(editorplugin);
 
 			if (it == allEditorPlugins_.End())
 			{

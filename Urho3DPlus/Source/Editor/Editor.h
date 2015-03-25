@@ -1,8 +1,8 @@
 #pragma once
 
-#include "..\Core\Object.h"
-#include "..\Container\Vector.h"
-#include "..\Core\Variant.h"
+#include "../Core/Object.h"
+#include "../Container/Vector.h"
+#include "../Core/Variant.h"
 
 namespace Urho3D
 {

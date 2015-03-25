@@ -8,9 +8,9 @@
  */
 
 #pragma once
-#include "..\Core\Object.h"
+#include "../Core/Object.h"
 
-#include "..\Scene\Serializable.h"
+#include "../Scene/Serializable.h"
 
 namespace Urho3D
 {
@@ -99,7 +99,7 @@ namespace Urho3D
 		SharedPtr<ProjectSettings> newProject_;
 		SharedPtr<ProjectSettings> selectedProject_;
 
-		Vector<SharedPtr<ProjectSettings>> projects_;
+		Vector<SharedPtr<ProjectSettings> > projects_;
 
 		SharedPtr<TemplateManager> templateManager_;
 		SharedPtr<Text> templateSlectedText_;

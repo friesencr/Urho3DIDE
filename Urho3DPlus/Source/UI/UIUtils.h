@@ -21,13 +21,13 @@
 //
 #pragma once
 
-#include "..\Urho3D.h"
-#include "..\Core\Object.h"
-#include "..\Core\Context.h"
-#include "..\UI\UIElement.h"
-#include "..\Math\StringHash.h"
+#include "../Urho3D.h"
+#include "../Core/Object.h"
+#include "../Core/Context.h"
+#include "../UI/UIElement.h"
+#include "../Math/StringHash.h"
 #include "UIGlobals.h"
-#include "..\Core\Attribute.h"
+#include "../Core/Attribute.h"
 
 namespace Urho3D
 {

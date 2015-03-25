@@ -1,11 +1,11 @@
 #pragma once
 
 #include "EditorPlugin.h"
-#include "..\UI\BorderImage.h"
-#include "..\Math\Color.h"
+#include "../UI/BorderImage.h"
+#include "../Math/Color.h"
 #include "UIGlobals.h"
-#include "..\UI\UIElement.h"
-#include "..\Scene\Node.h"
+#include "../UI/UIElement.h"
+#include "../Scene/Node.h"
 
 namespace Urho3D
 {

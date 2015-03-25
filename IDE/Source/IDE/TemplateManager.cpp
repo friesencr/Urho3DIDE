@@ -123,7 +123,7 @@ namespace Urho3D
 		return selectedtemplate_;
 	}
 
-	Vector<SharedPtr<ProjectSettings>>& TemplateManager::GetTemplateProjects()
+	Vector<SharedPtr<ProjectSettings> >& TemplateManager::GetTemplateProjects()
 	{
 		return templateProjects_;
 	}

@@ -19,42 +19,42 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 //
-#include "..\Urho3D.h"
+#include "../Urho3D.h"
 #include "UIUtils.h"
-#include <Urho3D\IO\Log.h>
-#include <Urho3D\Scene\Scene.h>
-#include <Urho3D\Core\Object.h>
-#include <Urho3D\Core\ProcessUtils.h>
-#include <Urho3D\Core\CoreEvents.h>
-#include <Urho3D\IO\FileSystem.h>
-#include <Urho3D\Engine\Engine.h>
-#include <Urho3D\Resource\ResourceCache.h>
-#include <Urho3D\Input\Input.h>
-#include <Urho3D\UI\UI.h>
-#include <Urho3D\UI\UIElement.h>
-#include <Urho3D\UI\DropDownList.h>
-#include <Urho3D\UI\Text.h>
-#include <Urho3D\UI\UIEvents.h>
-#include <Urho3D\UI\ListView.h>
-#include <Urho3D\UI\LineEdit.h>
-#include <Urho3D\UI\CheckBox.h>
-#include <Urho3D\UI\Window.h>
-#include <Urho3D\UI\Menu.h>
+#include <Urho3D/IO/Log.h>
+#include <Urho3D/Scene/Scene.h>
+#include <Urho3D/Core/Object.h>
+#include <Urho3D/Core/ProcessUtils.h>
+#include <Urho3D/Core/CoreEvents.h>
+#include <Urho3D/IO/FileSystem.h>
+#include <Urho3D/Engine/Engine.h>
+#include <Urho3D/Resource/ResourceCache.h>
+#include <Urho3D/Input/Input.h>
+#include <Urho3D/UI/UI.h>
+#include <Urho3D/UI/UIElement.h>
+#include <Urho3D/UI/DropDownList.h>
+#include <Urho3D/UI/Text.h>
+#include <Urho3D/UI/UIEvents.h>
+#include <Urho3D/UI/ListView.h>
+#include <Urho3D/UI/LineEdit.h>
+#include <Urho3D/UI/CheckBox.h>
+#include <Urho3D/UI/Window.h>
+#include <Urho3D/UI/Menu.h>
 
 
-#include <Urho3D\Graphics\Graphics.h>
-#include <Urho3D\Scene\Component.h>
-#include <Urho3D\Graphics\Renderer.h>
-#include <Urho3D\Scene\SceneEvents.h>
-#include <Urho3D\Graphics\Camera.h>
-#include <Urho3D\Resource\XMLFile.h>
-#include <Urho3D\Graphics\Viewport.h>
-#include <Urho3D\Graphics\GraphicsEvents.h>
+#include <Urho3D/Graphics/Graphics.h>
+#include <Urho3D/Scene/Component.h>
+#include <Urho3D/Graphics/Renderer.h>
+#include <Urho3D/Scene/SceneEvents.h>
+#include <Urho3D/Graphics/Camera.h>
+#include <Urho3D/Resource/XMLFile.h>
+#include <Urho3D/Graphics/Viewport.h>
+#include <Urho3D/Graphics/GraphicsEvents.h>
 
-#include <Urho3D\Audio\Audio.h>
-#include <Urho3D\Graphics\Texture2D.h>
-#include <Urho3D\UI\BorderImage.h>
-#include <Urho3D\UI\ToolTip.h>
+#include <Urho3D/Audio/Audio.h>
+#include <Urho3D/Graphics/Texture2D.h>
+#include <Urho3D/UI/BorderImage.h>
+#include <Urho3D/UI/ToolTip.h>
 #include <Urho3D/DebugNew.h>
 #include "../UI/Button.h"
 #include "UIGlobals.h"

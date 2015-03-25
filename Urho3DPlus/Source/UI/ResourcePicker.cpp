@@ -21,8 +21,8 @@
 //
 #include "../Urho3D.h"
 
-#include "../Core\Context.h"
-#include "../Core\Object.h"
+#include "../Core/Context.h"
+#include "../Core/Object.h"
 
 #include "ResourcePicker.h"
 #include "Utils/Helpers.h"

@@ -20,9 +20,9 @@
 // THE SOFTWARE.
 //
 #pragma once
-#include "..\Core\Object.h"
-#include "..\Scene\Serializable.h"
-#include "..\Container\Vector.h"
+#include "../Core/Object.h"
+#include "../Scene/Serializable.h"
+#include "../Container/Vector.h"
 
 
 namespace Urho3D

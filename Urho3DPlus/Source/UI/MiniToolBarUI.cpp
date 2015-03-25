@@ -4,18 +4,18 @@
 
 
 
-#include "..\Urho3D.h"
-#include "..\Core\Context.h"
-#include "..\UI\BorderImage.h"
-#include "..\UI\UI.h"
-#include "..\UI\Menu.h"
-#include "..\Math\Rect.h"
-#include "..\UI\Text.h"
-#include "..\UI\Window.h"
-#include "..\Input\InputEvents.h"
-#include "..\UI\UIEvents.h"
-#include "..\UI\CheckBox.h"
-#include "..\UI\ToolTip.h"
+#include "../Urho3D.h"
+#include "../Core/Context.h"
+#include "../UI/BorderImage.h"
+#include "../UI/UI.h"
+#include "../UI/Menu.h"
+#include "../Math/Rect.h"
+#include "../UI/Text.h"
+#include "../UI/Window.h"
+#include "../Input/InputEvents.h"
+#include "../UI/UIEvents.h"
+#include "../UI/CheckBox.h"
+#include "../UI/ToolTip.h"
 #include "MiniToolBarUI.h"
 
 

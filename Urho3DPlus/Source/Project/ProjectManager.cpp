@@ -38,11 +38,6 @@
 
 namespace Urho3D
 {
-	void ProjectManager::RegisterObject(Context* context)
-	{
-		context->RegisterFactory<ProjectManager>();
-	}
-
 	void ProjectManager::SetProjectRootFolder(const String& path)
 	{
 		projectsRootDir_ = path;

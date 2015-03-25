@@ -1003,8 +1003,8 @@ namespace Urho3D
 				return;
 
 			PODVector<RayQueryResult> result_;
-			editorScene->GetComponent<Octree>()->RaycastSingle(RayOctreeQuery(result_,cameraRay, RAY_TRIANGLE, camera_->GetFarClip(),
-				pickModeDrawableFlags[pickMode], 0x7fffffff));
+			RayOctreeQuery query_(result_,cameraRay, RAY_TRIANGLE, camera_->GetFarClip(), pickModeDrawableFlags[pickMode], 0x7fffffff);
+			editorScene->GetComponent<Octree>()->RaycastSingle(query_);
 
 			if (result_.Size() != 0 && result_[0].drawable_ != NULL)
 			{
@@ -2160,10 +2160,10 @@ namespace Urho3D
 		if (!updateGridGeometry)
 			return;
 
-		unsigned int size = unsigned int(floor(8.0f / 2.0f) * 2.0f);
+		unsigned int size = (unsigned int)(floor(8.0f / 2.0f) * 2.0f);
 		float halfSizeScaled = size / 2.0f;
 		float scale = 1.0f;
-		unsigned int subdivisionSize = unsigned int(pow(2.0f, 3.0f));
+		unsigned int subdivisionSize = (unsigned int)(pow(2.0f, 3.0f));
 
 		if (subdivisionSize > 0)
 		{
@@ -2368,7 +2368,8 @@ namespace Urho3D
 
 	void EPScene3DView::OpenViewportSettingsWindow()
 	{
-		UpdateSettingsUI(StringHash::ZERO, VariantMap());
+		VariantMap emptyMap;
+		UpdateSettingsUI(StringHash::ZERO, emptyMap);
 
 		settingsWindow->SetVisible(true);
 		settingsWindow->BringToFront();
@@ -2478,7 +2479,8 @@ namespace Urho3D
 	void EPScene3DView::SetOrthographic(bool orthographic)
 	{
 		camera_->SetOrthographic(orthographic);
-		UpdateSettingsUI(StringHash::ZERO, VariantMap());
+		VariantMap emptyMap;
+		UpdateSettingsUI(StringHash::ZERO, emptyMap);
 	}
 
 	void EPScene3DView::HandleResize()
@@ -2537,7 +2539,10 @@ namespace Urho3D
 	void EPScene3DView::ToggleViewportSettingsWindow(StringHash eventType, VariantMap& eventData)
 	{
 		if (settingsWindow->IsVisible())
-			CloseViewportSettingsWindow(StringHash::ZERO, VariantMap());
+		{
+			VariantMap emptyMap;
+			CloseViewportSettingsWindow(StringHash::ZERO, emptyMap);
+		}
 		else
 			OpenViewportSettingsWindow();
 	}

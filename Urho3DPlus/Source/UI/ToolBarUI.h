@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include "..\UI\UIElement.h"
-#include "..\UI\BorderImage.h"
+#include "../UI/UIElement.h"
+#include "../UI/BorderImage.h"
 
 namespace Urho3D
 {

@@ -125,7 +125,7 @@ namespace Urho3D
 		EditorPlugin*			mainEditorPlugin_;
 		Vector<EditorPlugin*>	activeSubEditorPlugins_;
 		Vector<EditorPlugin*>	mainEditorPlugins_;
-		Vector<SharedPtr<EditorPlugin>> allEditorPlugins_;
+		Vector<SharedPtr<EditorPlugin> > allEditorPlugins_;
 
 		SharedPtr<Camera>	camera_;
 		SharedPtr<Node>		cameraNode_;

@@ -2,20 +2,20 @@
 
 
 
-#include "..\Urho3D.h"
-#include "..\Core\Context.h"
-#include "..\UI\BorderImage.h"
-#include "..\UI\UI.h"
-#include "..\UI\Menu.h"
-#include "..\Math\Rect.h"
-#include "..\UI\Text.h"
-#include "..\UI\Window.h"
-#include "..\Input\InputEvents.h"
-#include "..\UI\UIEvents.h"
+#include "../Urho3D.h"
+#include "../Core/Context.h"
+#include "../UI/BorderImage.h"
+#include "../UI/UI.h"
+#include "../UI/Menu.h"
+#include "../Math/Rect.h"
+#include "../UI/Text.h"
+#include "../UI/Window.h"
+#include "../Input/InputEvents.h"
+#include "../UI/UIEvents.h"
 #include "ToolBarUI.h"
-#include "..\UI\CheckBox.h"
-#include "..\UI\ToolTip.h"
-#include "..\UI\ScrollBar.h"
+#include "../UI/CheckBox.h"
+#include "../UI/ToolTip.h"
+#include "../UI/ScrollBar.h"
 
 namespace Urho3D
 {

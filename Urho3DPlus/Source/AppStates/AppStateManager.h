@@ -22,11 +22,11 @@
 
 #pragma once
 
-#include "..\Core\Context.h"
-#include "..\Core\Object.h"
-#include "..\Container\List.h"
-#include "..\Container\HashMap.h"
-#include "..\Scene\Serializable.h"
+#include "../Core/Context.h"
+#include "../Core/Object.h"
+#include "../Container/List.h"
+#include "../Container/HashMap.h"
+#include "../Scene/Serializable.h"
 
 // All Urho3D classes reside in namespace Urho3D
 namespace Urho3D

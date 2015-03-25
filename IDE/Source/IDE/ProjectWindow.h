@@ -8,7 +8,7 @@
  */
 
 #pragma once
-#include "..\Core\Object.h"
+#include "../Core/Object.h"
 
 namespace Urho3D
 {
